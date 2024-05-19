@@ -1,4 +1,9 @@
-// created by beatwaster aka b34t 
+// EmbLab extension for AUTOMATIC1111/stable-diffusion-webui
+//
+// https://github.com/834t/sd-a1111-b34t-emblab
+// version 0.8 - 2024-05-19
+//
+
 // util
 function toHTML(htmlString) {
 	const div = document.createElement('div');
