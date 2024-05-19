@@ -10,3 +10,5 @@ and
 `https://github.com/CodeExplode/stable-diffusion-webui-embedding-editor.git`
 
 the manual will be out soon, but most likely I will need a video to explain the principle of it
+
+[![VideoReadMe](https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
