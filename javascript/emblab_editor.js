@@ -11,6 +11,52 @@ function toHTML(htmlString) {
 	return div.firstChild;
 }
 
+const EmbLab_JSON_weights = {
+	loadInput: document.createElement('input'),
+	saveA: document.createElement( "a" ),
+	fr: new FileReader(),
+	dataMark: 'emblab_token_weights',
+	load: function( callback ){
+		this.loadCallback = callback;
+		this.loadInput.click();
+	},
+	loadCallback: function(){},
+	save: function( JSON_DATA ){
+		const __a = this.saveA;
+		__a.href = URL.createObjectURL( new Blob( [ JSON.stringify( {
+			data: JSON_DATA,
+			type: this.dataMark,
+		} ) ], { type: "application/json" } ) );
+		__a.download = name;
+		__a.click();
+	},
+	init: function(){
+		const loadInput = this.loadInput;
+		const fr = this.fr;
+		loadInput.type = 'file';
+		loadInput.accept = 'application/json';
+		loadInput.addEventListener( 'change', ( e ) => {
+			const file = loadInput.files[0];
+			if(!file) return null;
+			fr.readAsText( file );
+		} );
+		fr.onload = () => {
+			let nextJSON = null;
+			try {
+				nextJSON = JSON.parse( this.fr.result );
+			} catch( err ){
+				console.log( err );
+				return null;
+			}
+			if(!nextJSON) return null;
+			const { data, type } = nextJSON;
+			if( type != this.dataMark ) return null;
+			this.loadCallback( data );
+		}
+	}
+}
+EmbLab_JSON_weights.init();
+
 const EmblabStyles = `
 	// #emblab_workspace {
 	// 	background-color: #ffffff;
@@ -51,11 +97,11 @@ const EmblabStyles = `
 		float: left;
 	}
 	.emblab_row_menu_leftmodule .emblab_row_menu_info{
-		width: 110px;
+		width: 100px;
 	}
 
 	.emblab_row_menu_leftmodule input {
-		max-width: 75px;
+		max-width: 65px;
 	}
 
 	.emblab_row_menu_rightmodule{
@@ -569,100 +615,6 @@ class EmblabTokenRow {
 			},
 		] );
 		
-
-		return;
-
-		const promptResult = prompt( `
-1 - copy chank to clipboard
-2 - replace in same position
-3 - replace from selector position
-4 - mix in same position
-5 - mix from selector position
-`);
-
-		// copy to clipboard
-		if( promptResult == 1 ){
-			const weights_to_clipboard = {
-				start: this.selectorStart,
-				end: this.selectorEnd,
-				width: this.selectorEnd - this.selectorStart,
-				weights: [],
-				accent: this.getAccent(),
-			};
-			if( weights_to_clipboard.width > 0 ){
-				for( let i = this.selectorStart; i < this.selectorEnd; i++ ){
-					weights_to_clipboard.weights.push( 
-						JSON.parse( JSON.stringify( this.weights[ i ] ) )
-					);
-				}
-				this.EMBLAB_API.setClipboard( weights_to_clipboard );
-			}
-		}
-
-		// replace by clipboard in the same position
-		if( promptResult == 2 ){
-			const currentClipboard = this.EMBLAB_API.getClipboard();
-			for( let i = 0; i < currentClipboard.weights.length; i++ ){
-				const nextPosition = i + currentClipboard.start;
-				if( this.weights[ nextPosition ] ){
-					this.weights[ nextPosition ] = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) )
-				}
-			}
-			this.drawWeights();
-		}
-
-		// replace by clipboard from the selector start
-		if( promptResult == 3 ){
-			const currentClipboard = this.EMBLAB_API.getClipboard();
-			for( let i = 0; i < currentClipboard.weights.length; i++ ){
-				const nextPosition = i + this.selectorStart;
-				if( this.weights[ nextPosition ] ){
-					this.weights[ nextPosition ] = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) )
-				}
-			}
-			this.drawWeights();
-		}
-
-		// mix by clipboard in the same position
-		if( promptResult == 4 ){
-			const currentClipboard = this.EMBLAB_API.getClipboard();
-			for( let i = 0; i < currentClipboard.weights.length; i++ ){
-				const nextPosition = i + currentClipboard.start;
-				if( this.weights[ nextPosition ] ){
-					const currentVal = this.weights[ nextPosition ];
-					const clipboardVal = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) );
-					const finallyVal = [
-						( currentVal[ 0 ] + ( clipboardVal[0] * currentClipboard.accent ) ) / 2,
-						( currentVal[ 1 ] + ( clipboardVal[1] * currentClipboard.accent ) ) / 2,
-						( currentVal[ 2 ] + ( clipboardVal[2] * currentClipboard.accent ) ) / 2,
-					];
-
-					this.weights[ nextPosition ] = finallyVal;
-				}
-			}
-			this.drawWeights();
-		}
-
-		// mix by clipboard in the selector start
-		if( promptResult == 5 ){
-			const currentClipboard = this.EMBLAB_API.getClipboard();
-			for( let i = 0; i < currentClipboard.weights.length; i++ ){
-				const nextPosition = i + this.selectorStart;
-				if( this.weights[ nextPosition ] ){
-					const currentVal = this.weights[ nextPosition ];
-					const clipboardVal = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) );
-					const finallyVal = [
-						( currentVal[ 0 ] + ( clipboardVal[0] * currentClipboard.accent ) ) / 2,
-						( currentVal[ 1 ] + ( clipboardVal[1] * currentClipboard.accent ) ) / 2,
-						( currentVal[ 2 ] + ( clipboardVal[2] * currentClipboard.accent ) ) / 2,
-					];
-
-					this.weights[ nextPosition ] = finallyVal;
-				}
-			}
-			this.drawWeights();
-		}
-
 	}
 
 	bindCanvasEvents(){
@@ -833,6 +785,8 @@ class EmblabTokenRow {
 
 	bindMenuButtonsControl(){
 
+		const emblab_rowmenu_save_w_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_save_w');
+		const emblab_rowmenu_load_w_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_load_w');
 		const canHeightUp_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_height_up');
 		const canHeightDown_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_height_down');
 		const pencilDrawMode_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_pencil_edit');
@@ -857,8 +811,25 @@ class EmblabTokenRow {
 			}
 		} );
 
+		emblab_rowmenu_save_w_button.addEventListener( 'click', () => {
+			EmbLab_JSON_weights.save({
+				tagid: this.tagid, 
+				tagname: this.tagname, 
+				weights: JSON.parse(JSON.stringify( this.weights )), 
+				group_index: this.group_index, 
+				accent: this.getAccent(),
+			});
+		} );
+
 		const isASourceRow = this.EMBLAB_API.isASourceRow( this );
 		if(!isASourceRow) return false;
+
+		emblab_rowmenu_load_w_button.addEventListener( 'click', (  ) => {
+			EmbLab_JSON_weights.load( ( data ) => {
+				this.weights = data.weights;
+				this.drawWeights();
+			} );
+		} );
 
 		const removeSelections = () => {
 			pencilDrawMode_button.classList.remove('selected_row_button');
@@ -893,7 +864,7 @@ class EmblabTokenRow {
 		const s = this.selectorStart;
 		const e = this.selectorEnd;
 		const w = this.selectorEnd - this.selectorStart;
-		selection_monitor.innerText = `selected - start: ${s} | end ${e} | width: ${w} `;
+		selection_monitor.innerText = `[ start: ${s} | end ${e} | width: ${w} ]`;
 	}
 
 	buildMenu(){
@@ -931,6 +902,8 @@ class EmblabTokenRow {
 				<div class="emblab_row_menu_rightmodule">
 					<button title="Zoom in" class="emblab_rowmenu_height_up">&#x1F50D;+</button>
 					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button> || 
+					<button title="Save weights" class="emblab_rowmenu_save_w">💾</button>
+					<button title="Load weight" class="emblab_rowmenu_load_w">📁</button> || 
 					<button title="Duplicate row" class="emblab_rowmenu_duplicate">&#x2398;</button> ||
 					<button title="Pencil edit mode" class="emblab_rowmenu_pencil_edit">&#x270E;</button>
 					<button title="Zonal edit mode" class="emblab_rowmenu_zonal_edit">&#x2334;</button> ||
@@ -942,6 +915,7 @@ class EmblabTokenRow {
 				<div class="emblab_row_menu_rightmodule">
 					<button title="Zoom in" class="emblab_rowmenu_height_up">&#x1F50D;+</button>
 					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button> || 
+					<button title="Save weights" class="emblab_rowmenu_save_w">💾</button>
 				</div>
 			`);
 		}
