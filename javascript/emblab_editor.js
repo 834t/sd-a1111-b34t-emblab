@@ -45,7 +45,7 @@ const EmbLab_JSON_weights = {
 			try {
 				nextJSON = JSON.parse( this.fr.result );
 			} catch( err ){
-				console.log( err );
+				console.warn( err );
 				return null;
 			}
 			if(!nextJSON) return null;
@@ -134,6 +134,7 @@ const EmblabStyles = `
 
 `;
 
+const EMBLAB_PROJECT_TYPE = 'EMBLAB_PROJECT';
 const EMBLAB_MIN_CAN_HEIGHT = 32;
 let EMBLAB_CURRENT_CAN_HEIGHT = EMBLAB_MIN_CAN_HEIGHT;
 const EMBLAB_MAX_CAN_HEIGHT = 256;
@@ -237,7 +238,39 @@ class EmblabApp{
 			accent: 1,
 		};
 
-		// console.log( this );
+	}
+
+	serializeProjectData(){
+		const data = {
+			type: EMBLAB_PROJECT_TYPE, 
+			name: this.getEmbeddingNameForCreation(),
+			step: this.getEmbeddingStepForCreation(),
+			rows: [] 
+		}
+		for( const nextRow of this.rows ) data.rows.push( nextRow.serializeRowData() );
+		return data;
+	}
+
+	autoLoad(){
+		const autosavedProjectData_asText = localStorage.getItem('EMBLAB_PROJECT');
+		let autosavedProjectData;
+		try{
+			autosavedProjectData = JSON.parse( autosavedProjectData_asText );
+		} catch( err ){
+			console.warn( err );
+		}
+		if( !autosavedProjectData )return false;
+		if( autosavedProjectData ){
+			this.setEmbeddingNameForCreation( autosavedProjectData.name || '' );
+			this.setEmbeddingStepForCreation( autosavedProjectData.step || 0 );
+			const rows = autosavedProjectData.rows;
+			this.applyLoadedData( rows );
+		}
+	}
+
+	autosaveProjectData(){
+		const serializedData = this.serializeProjectData();
+		localStorage.setItem('EMBLAB_PROJECT', JSON.stringify( serializedData ));
 	}
 
 	buildMenu(){
@@ -251,7 +284,6 @@ class EmblabApp{
 				<button title="Load project" class="emblab_menu_load">📁 load project</button> 
 			</div>
 		`);
-		const EMBLAB_PROJECT_TYPE = 'EMBLAB_PROJECT';
 		this.el_menu_save_button = this.el_menu_buttons_line.querySelector('.emblab_menu_save');
 		this.el_menu_save_button.addEventListener( 'click', () => {
 			const data = { 
@@ -290,6 +322,8 @@ class EmblabApp{
 		this.appContainer.appendChild( this.el );
 
 		this.buildMenu();
+
+		this.autoLoad();
 
 	}
 
@@ -330,14 +364,14 @@ class EmblabApp{
 	get API(){
 
 		return {
+			autoSave: () => {
+				this.autosaveProjectData();
+			},
 			removeRow: ( row ) => {
 
 				if( !confirm( 'r u sure to delete this row?' ) ){
 					return null;
 				}
-
-
-				// console.log( 'removeRow', { row } );
 
 				const isSourceRow = row.rowsholder === this.el_rowsholder;
 				const isCombinedRow = row.rowsholder === this.el_rowsholder_combined;
@@ -358,6 +392,7 @@ class EmblabApp{
 					this.rows_modifyed = nextRows;
 					this.el_rowsholder_combined.removeChild( row.el );
 				}
+				this.API.autoSave();
 			},
 			isASourceRow: ( row ) => {
 				return row.rowsholder === this.el_rowsholder;
@@ -413,7 +448,6 @@ class EmblabApp{
 
 
 	applyLoadedData( tokensArray ){
-		// console.log(  promptString, tokensArray  );
 		this.resetRowsHTML();
 		this.rows = [];
 		let group_index = 0;
@@ -435,7 +469,6 @@ class EmblabApp{
 	}
 
 	applyData( promptString, tokensArray ){
-		// console.log(  promptString, tokensArray  );
 		this.resetRowsHTML();
 		this.rows = [];
 		let group_index = 0;
@@ -507,7 +540,6 @@ class EmblabApp{
 
 	serializeData(){
 		const combined_data = JSON.stringify(this.combineData());
-		// console.log( { combined_data } );
 		const name = this.getEmbeddingNameForCreation();
 		return [ name, combined_data ];
 	}
@@ -622,6 +654,7 @@ class EmblabTokenRow {
 						}
 					}
 					this.drawWeights();
+					this.EMBLAB_API.autoSave();
 				}
 			},
 			{
@@ -635,6 +668,7 @@ class EmblabTokenRow {
 						}
 					}
 					this.drawWeights();
+					this.EMBLAB_API.autoSave();
 				}
 			},
 			{
@@ -656,6 +690,7 @@ class EmblabTokenRow {
 						}
 					}
 					this.drawWeights();
+					this.EMBLAB_API.autoSave();
 				}
 			},
 			{
@@ -677,6 +712,7 @@ class EmblabTokenRow {
 						}
 					}
 					this.drawWeights();
+					this.EMBLAB_API.autoSave();
 				}
 			},
 		] );
@@ -732,6 +768,7 @@ class EmblabTokenRow {
 		const mouseUpEvent = () => {
 			this.can.removeEventListener( 'pointermove', mouseMoveEvent );
 			document.removeEventListener( 'pointerup', mouseUpEvent );
+			this.EMBLAB_API.autoSave();
 		}
 		const mousDownEvent = ( event ) => {
 			// // set ui line to zero
@@ -868,7 +905,7 @@ class EmblabTokenRow {
 		const pencilDrawMode_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_pencil_edit');
 		const zonalEditMode_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_zonal_edit');
 		const removeRow_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_remove_row');
-		const duplicate_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_duplicate');
+		// const duplicate_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_duplicate');
 
 
 		canHeightUp_button.addEventListener( 'click', () => {
@@ -889,6 +926,7 @@ class EmblabTokenRow {
 
 		emblab_rowmenu_save_w_button.addEventListener( 'click', () => {
 			EmbLab_JSON_weights.save( this.serializeRowData() );
+			this.EMBLAB_API.autoSave();
 		} );
 
 		const isASourceRow = this.EMBLAB_API.isASourceRow( this );
@@ -898,6 +936,7 @@ class EmblabTokenRow {
 			EmbLab_JSON_weights.load( ( data ) => {
 				this.weights = data.weights;
 				this.drawWeights();
+				this.EMBLAB_API.autoSave();
 			} );
 		} );
 
@@ -923,9 +962,9 @@ class EmblabTokenRow {
 			this.EMBLAB_API.removeRow( this );
 		} );
 
-		duplicate_button.addEventListener( 'click', () => {
-			this.EMBLAB_API.duplicate( this );
-		} );
+		// duplicate_button.addEventListener( 'click', () => {
+		// 	this.EMBLAB_API.duplicate( this );
+		// } );
 
 	}
 
@@ -1025,7 +1064,6 @@ function emblab_js_update( promptString, tokensArray ){
 	if(error__) return false;
 
 	EmbLabEditor.applyData( promptString, parsedTokenised );
-	// console.log( 'emblab_init', { promptString, parsedTokenised } );
 }
 
 function send_to_py(){
@@ -1034,12 +1072,10 @@ function send_to_py(){
 
 function receive( somethin ){
 
-	// console.log( 'emblab_init', { arguments } );
 }
 
 function emblab_js_save_embedding() {
 	const forSave = EmbLabEditor.serializeData();
-	// console.log( { forSave } );
 	return forSave;
 }
 
