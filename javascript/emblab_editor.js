@@ -224,7 +224,6 @@ class EmblabApp{
 		this.el_rowsholder_combined = toHTML( `<div></div>`);
 		this.el_rowsholder_combined_container.appendChild( this.el_rowsholder_combined );
 
-		this.init();
 
 		this.rows = [];
 		this.rows_modifyed = [];
@@ -238,6 +237,7 @@ class EmblabApp{
 			accent: 1,
 		};
 
+		this.init();
 	}
 
 	serializeProjectData(){
@@ -1062,7 +1062,7 @@ function emblab_js_update( promptString, tokensArray ){
 		console.warn( err );
 	}
 	if(error__) return false;
-
+	if(parsedTokenised.length < 1) return false;
 	EmbLabEditor.applyData( promptString, parsedTokenised );
 }
 
