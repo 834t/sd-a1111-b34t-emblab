@@ -245,6 +245,39 @@ class EmblabApp{
 		this.el_menu.appendChild( this.el_new_embedding_name );
 		this.el_new_embedding_step = toHTML( `<div>| new embedding step: <input title="for training" id="emblab_editor_new_embedding_step" type="number" min="0" step="1" value="0"/></div>`);
 		this.el_menu.appendChild( this.el_new_embedding_step );
+		this.el_menu_buttons_line = toHTML(`
+			<div>
+				<button title="Save project" class="emblab_menu_save">💾 save project</button>
+				<button title="Load project" class="emblab_menu_load">📁 load project</button> 
+			</div>
+		`);
+		const EMBLAB_PROJECT_TYPE = 'EMBLAB_PROJECT';
+		this.el_menu_save_button = this.el_menu_buttons_line.querySelector('.emblab_menu_save');
+		this.el_menu_save_button.addEventListener( 'click', () => {
+			const data = { 
+				type: EMBLAB_PROJECT_TYPE, 
+				name: this.getEmbeddingNameForCreation(),
+				step: this.getEmbeddingStepForCreation(),
+				rows: [] 
+			}
+			for( const nextRow of this.rows ) data.rows.push( nextRow.serializeRowData() );
+			EmbLab_JSON_weights.save( data );
+		});
+
+		this.el_menu_load_button = this.el_menu_buttons_line.querySelector('.emblab_menu_load');
+		this.el_menu_load_button.addEventListener( 'click', () => {
+			EmbLab_JSON_weights.load( ( data ) => {
+				if( data.type === EMBLAB_PROJECT_TYPE ){
+					this.setEmbeddingNameForCreation( data.name || '' );
+					this.setEmbeddingStepForCreation( data.step || 0 );
+					const rows = data.rows;
+					this.applyLoadedData( rows );
+				}
+			} );
+		});
+
+		this.el_menu.appendChild( this.el_menu_buttons_line );
+
 	}
 
 	init(){
@@ -260,10 +293,20 @@ class EmblabApp{
 
 	}
 
+	setEmbeddingStepForCreation( step = 0){
+		const el = this.el_new_embedding_step.querySelector('#emblab_editor_new_embedding_step');
+		el.value = step;	
+	}
+
 	getEmbeddingStepForCreation(){
-		const el = this.el_new_embedding_name.querySelector('#emblab_editor_new_embedding_step');	
+		const el = this.el_new_embedding_step.querySelector('#emblab_editor_new_embedding_step');	
 		const name = parseInt(el.value);	
 		return name;
+	}
+
+	setEmbeddingNameForCreation( name = ''){
+		const el = this.el_new_embedding_name.querySelector('#emblab_editor_new_embedding_name');
+		el.value = name;	
 	}
 
 	getEmbeddingNameForCreation(){
@@ -369,6 +412,28 @@ class EmblabApp{
 	}
 
 
+	applyLoadedData( tokensArray ){
+		// console.log(  promptString, tokensArray  );
+		this.resetRowsHTML();
+		this.rows = [];
+		let group_index = 0;
+		for( const nextToken of tokensArray ){
+			const nextRow = new EmblabTokenRow( 
+				this.el_rowsholder, 
+				{
+					tagid: nextToken.tagid,
+					tagname: nextToken.tagname,
+					weights: nextToken.weights,
+					group_index: nextToken.group_index || group_index,
+					accent: nextToken.accent || 1
+				}, 
+				this.API,  
+			);
+			this.rows.push( nextRow );
+			group_index++;
+		}
+	}
+
 	applyData( promptString, tokensArray ){
 		// console.log(  promptString, tokensArray  );
 		this.resetRowsHTML();
@@ -450,7 +515,7 @@ class EmblabApp{
 }
 
 class EmblabTokenRow {
-	constructor( EmblabRowsHolder, { tagname, tagid, weights, group_index }, EMBLAB_API ){
+	constructor( EmblabRowsHolder, { tagname, tagid, weights, group_index, accent }, EMBLAB_API ){
 
 		this.EMBLAB_API = EMBLAB_API;
 			
@@ -459,7 +524,8 @@ class EmblabTokenRow {
 		this.tagname = tagname;
 		this.tagid = tagid;
 		this.weights = weights;
-		this.group_index = group_index;
+		this.group_index = group_index || 1;
+		this.initAccent = accent || 1;
 		
 		this.el = toHTML( `<div class="emblab_workspace_row" title="${tagname}:${tagid}"></div>`);
 		this.el_menu = toHTML(`<div class="emblab_workspace_row_menu" style="width:100%"></div>`);
@@ -769,7 +835,7 @@ class EmblabTokenRow {
 
 	getAccent(){
 		const asccentInput = this.el_menu_left_module.querySelector('.emblab_row_accent');
-		return parseFloat( asccentInput.value );
+		return asccentInput ? parseFloat( asccentInput.value ) : 1;
 	}
 
 	getWeights(){
@@ -781,6 +847,16 @@ class EmblabTokenRow {
 		}
 		return nextWeights;
 		// return parseFloat( this.el_menu_group.querySelector('.emblab_row_accent').value );
+	}
+
+	serializeRowData(){
+		return {
+			tagid: this.tagid, 
+			tagname: this.tagname, 
+			weights: JSON.parse(JSON.stringify( this.weights )), 
+			group_index: this.group_index, 
+			accent: this.getAccent(),
+		};
 	}
 
 	bindMenuButtonsControl(){
@@ -812,13 +888,7 @@ class EmblabTokenRow {
 		} );
 
 		emblab_rowmenu_save_w_button.addEventListener( 'click', () => {
-			EmbLab_JSON_weights.save({
-				tagid: this.tagid, 
-				tagname: this.tagname, 
-				weights: JSON.parse(JSON.stringify( this.weights )), 
-				group_index: this.group_index, 
-				accent: this.getAccent(),
-			});
+			EmbLab_JSON_weights.save( this.serializeRowData() );
 		} );
 
 		const isASourceRow = this.EMBLAB_API.isASourceRow( this );
@@ -880,6 +950,7 @@ class EmblabTokenRow {
 					<div class="selection_monitor"></div>
 				</div>
 			`);
+			this.el_menu_left_module.querySelector('.emblab_row_accent').value = this.initAccent;
 		} else {
 			this.el_menu_left_module = toHTML(`
 				<div class="emblab_row_menu_leftmodule">
