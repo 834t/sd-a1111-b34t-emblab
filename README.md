@@ -9,6 +9,36 @@ of deleted repositoty `https://github.com/tkalayci71/embedding-inspector`
 and 
 `https://github.com/CodeExplode/stable-diffusion-webui-embedding-editor.git`
 
-ReadMe:
+it's an embedding laboratory extension where you can easily modify merge and create embeddings by bunch of tokens.
+
+There you can merge it by groups of prompt what you have, or merge all into one token.
+
+You have zonal editor tool where you can copy and paste chunks of weights between tokens in your embedding.
+
+You have pen tool for just "draw" weights on each token-track.
+
+You can change the accent of each token track and then combine it into finaly tokens to save as an Embedding (Textual inversion)
+
+btw with this tool It's looks more like work in some sound editor.
+
+this is not a tool for everyone, becouse it can looks a little bit complex, and there no some magic from a box, but you can have realy big fun of it, if you like to experiment.
+
+for example you can create 1-token style by merging some 4-5 tokens like
+
+"shine shock string detailed sharp"
+
+and get some single-token adjustment to change the result of your prompt.
+
+but also you can not just merge.
+
+you can duplicate one of the "token track" incrase its accent and draw an adjustment track by pen tool for use this duplicated row as and adjuster for whole merge.
+
+or just combine you single token by parts of other token weights, or any other variants. It's veryr flexible stuff tbh.
+
+heare a videofile that provide basics for this extension.
+
+works only for SD1.5 but who cares, it's just for fun and you can get it ) have a nice time!
+
+short overview:
 
 [![VideoReadMe](https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
