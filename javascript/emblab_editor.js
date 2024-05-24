@@ -11,6 +11,18 @@ function toHTML(htmlString) {
 	return div.firstChild;
 }
 
+function dateNow(){
+	const date = new Date();
+	let year = date.getFullYear();
+	let month = ( date.getMonth() + '' ).length === 1 ? '0' + ( date.getMonth() + 1 ) : date.getMonth() + 1;
+	let day = ( date.getDate() + '' ).length === 1 ? '0' + date.getDate(): date.getDate();
+	let hours = ( date.getHours() + '' ).length === 1 ? '0' + date.getHours(): date.getHours();
+	let minutes = ( date.getMinutes() + '' ).length === 1 ? '0' + date.getMinutes(): date.getMinutes();
+	let seconds = ( date.getSeconds() + '' ).length === 1 ? '0' + date.getSeconds(): date.getSeconds();
+	const combined_string = `${year}${month}${day}-${hours}${minutes}${seconds}`;
+	return combined_string;
+}
+
 const EmbLab_JSON_weights = {
 	loadInput: document.createElement('input'),
 	saveA: document.createElement( "a" ),
@@ -21,13 +33,13 @@ const EmbLab_JSON_weights = {
 		this.loadInput.click();
 	},
 	loadCallback: function(){},
-	save: function( JSON_DATA ){
+	save: function( JSON_DATA, name = 'EmbLab_data.json' ){
 		const __a = this.saveA;
 		__a.href = URL.createObjectURL( new Blob( [ JSON.stringify( {
 			data: JSON_DATA,
 			type: this.dataMark,
 		} ) ], { type: "application/json" } ) );
-		__a.download = name;
+		__a.download = dateNow() + '_' + name;
 		__a.click();
 	},
 	init: function(){
@@ -293,7 +305,7 @@ class EmblabApp{
 				rows: [] 
 			}
 			for( const nextRow of this.rows ) data.rows.push( nextRow.serializeRowData() );
-			EmbLab_JSON_weights.save( data );
+			EmbLab_JSON_weights.save( data, this.getEmbeddingNameForCreation() );
 		});
 
 		this.el_menu_load_button = this.el_menu_buttons_line.querySelector('.emblab_menu_load');
@@ -366,6 +378,11 @@ class EmblabApp{
 		return {
 			autoSave: () => {
 				this.autosaveProjectData();
+			},
+			forEachRows: ( callback ) => {
+				for( let i = 0; i < this.rows.length; i++ ){
+					callback( i, this.rows[i] );
+				}
 			},
 			removeRow: ( row ) => {
 
@@ -486,6 +503,7 @@ class EmblabApp{
 			this.rows.push( nextRow );
 			group_index++;
 		}
+		this.API.autoSave();
 	}
 
 	combineData(){
@@ -620,9 +638,8 @@ class EmblabTokenRow {
 		}
 	}
 
-	processContextMenu( event ){
-
-		EmbLabEditorContextMenu.renderMenu( event, [
+	contextmenu_for_canvas(){
+		let CONTEXT_MENU_OPTIONS = [
 			{
 				title: 'copy to clipboard',
 				callback: () => {
@@ -715,8 +732,103 @@ class EmblabTokenRow {
 					this.EMBLAB_API.autoSave();
 				}
 			},
-		] );
-		
+		];
+
+		if( this.editState == EMBLAB_ROW_PENCIL_MODE ){
+			CONTEXT_MENU_OPTIONS.push( {
+				title: 'all weights to mid',
+				callback: () => {
+					for( const nextW of this.weights ){
+						nextW[0] = nextW[1] + ( ( nextW[2] - nextW[1] ) / 2 )
+					} 
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			} );
+			CONTEXT_MENU_OPTIONS.push( {
+				title: 'all weights absolute [0,-1, 1]',
+				callback: () => {
+					for( const nextW of this.weights ){
+						nextW[0] = 0;
+						nextW[1] = -1;
+						nextW[2] = 1;
+					} 
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			} );
+		}
+
+		// pencil tool additional options
+		if( this.editState == EMBLAB_ROW_ZONAL_MODE ){
+			CONTEXT_MENU_OPTIONS.push( {
+				title: 'zone weights to mid',
+				callback: () => {
+					const _W = this.weights;
+					for( let i = 0; i < _W.length; i++ ){
+						if( i <= this.selectorEnd && i >= this.selectorStart ){
+							_W[i][0] = _W[i][1] + ( ( _W[i][2] - _W[i][1] ) / 2 );
+						}
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			} );
+			CONTEXT_MENU_OPTIONS.push( {
+				title: 'zone weights to absolute [0,-1, 1]',
+				callback: () => {
+					const _W = this.weights;
+					for( let i = 0; i < _W.length; i++ ){
+						if( i <= this.selectorEnd && i >= this.selectorStart ){
+							_W[i][0] = 0;
+							_W[i][1] = -1;
+							_W[i][2] = 1;
+						}
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			} );
+		}
+
+		return CONTEXT_MENU_OPTIONS;
+	}
+
+	contextmenu_for_rowmenu(){
+		let CONTEXT_MENU_OPTIONS = [];
+
+		CONTEXT_MENU_OPTIONS.push( {
+			title: 'set current group index to all tokens',
+			callback: () => {
+				const currentGroup = this.getGroupIndex();
+				this.EMBLAB_API.forEachRows( ( i, row ) => {
+					row.setGroupIndex( currentGroup );
+				} );
+				this.EMBLAB_API.autoSave();
+			}
+		} );
+		CONTEXT_MENU_OPTIONS.push( {
+			title: 'set current accent to all tokens',
+			callback: () => {
+				const currentAccent = this.getAccent();
+				this.EMBLAB_API.forEachRows( ( i, row ) => {
+					row.setAccent( currentAccent );
+				} );
+				this.EMBLAB_API.autoSave();
+			}
+		} );
+
+		return CONTEXT_MENU_OPTIONS;
+	}
+
+	processContextMenu( event, special_element ){
+		let CONTEXT_MENU_OPTIONS = [];
+		if( !special_element ){
+			CONTEXT_MENU_OPTIONS = this.contextmenu_for_canvas( event );
+		} if ( special_element === 'row_menu' ) {
+			CONTEXT_MENU_OPTIONS = this.contextmenu_for_rowmenu( event );
+		}
+		EmbLabEditorContextMenu.renderMenu( event, CONTEXT_MENU_OPTIONS );
 	}
 
 	bindCanvasEvents(){
@@ -870,9 +982,19 @@ class EmblabTokenRow {
 		return parseInt( groupInput.value );
 	}
 
+	setGroupIndex( i ){
+		const groupInput = this.el_menu_left_module.querySelector('.emblab_row_group');		
+		groupInput.value = i;
+	}
+
 	getAccent(){
 		const asccentInput = this.el_menu_left_module.querySelector('.emblab_row_accent');
 		return asccentInput ? parseFloat( asccentInput.value ) : 1;
+	}
+
+	setAccent( i ){
+		const asccentInput = this.el_menu_left_module.querySelector('.emblab_row_accent');
+		asccentInput.value = i;
 	}
 
 	getWeights(){
@@ -925,12 +1047,22 @@ class EmblabTokenRow {
 		} );
 
 		emblab_rowmenu_save_w_button.addEventListener( 'click', () => {
-			EmbLab_JSON_weights.save( this.serializeRowData() );
+			EmbLab_JSON_weights.save( this.serializeRowData(), this.tagname );
 			this.EMBLAB_API.autoSave();
 		} );
 
 		const isASourceRow = this.EMBLAB_API.isASourceRow( this );
 		if(!isASourceRow) return false;
+
+		this.el_menu.addEventListener( 'contextmenu', ( event ) => {
+			event.preventDefault();
+			event.stopPropagation();
+		} );
+		this.el_menu.addEventListener( 'mousedown', ( event ) => {
+			if( event.button === 2 ){
+				this.processContextMenu( event, 'row_menu' );
+			}
+		} );
 
 		emblab_rowmenu_load_w_button.addEventListener( 'click', (  ) => {
 			EmbLab_JSON_weights.load( ( data ) => {
@@ -1064,6 +1196,7 @@ function emblab_js_update( promptString, tokensArray ){
 	if(error__) return false;
 	if(parsedTokenised.length < 1) return false;
 	EmbLabEditor.applyData( promptString, parsedTokenised );
+	
 }
 
 function send_to_py(){
