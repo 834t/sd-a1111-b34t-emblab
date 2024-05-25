@@ -210,6 +210,55 @@ def get_token_data( tokenName ):
         return weights
     except:
         return []
+    
+def LOGGING(txtToLog):
+    return txtToLog
+    
+def do_editExistedEmbedding( embedding_name ):
+
+    cond_model = shared.sd_model.cond_stage_model
+    embedding_layer = cond_model.wrapped.transformer.text_model.embeddings
+    
+    device = devices.device
+    if cmd_opts.medvram or cmd_opts.lowvram:
+        device = torch.device("cpu")
+
+    embedding = None
+
+    # if hasattr( sd_hijack.model_hijack.embedding_db.word_embeddings, embedding_name ):
+    try:
+        embedding = sd_hijack.model_hijack.embedding_db.word_embeddings[embedding_name]
+    except:
+        return [ 'embedding not found', [] ]
+
+    finally_emb_data = [ 
+        embedding.name,
+        embedding.vec,
+        embedding.step,
+        embedding.shape,
+        embedding.vectors,
+        embedding.cached_checksum,
+        embedding.sd_checkpoint,
+        embedding.sd_checkpoint_name,
+        embedding.optimizer_state_dict,
+        embedding.filename,
+        embedding.hash,
+        embedding.shorthash,
+    ]
+
+    vectors = []
+    for i in range( embedding.vectors ):
+
+        nextTensor = embedding.vec[i]
+        nextVecToPush = []
+        for n in range( embedding.shape ):
+            floor = emblab_distribution_floor[n].item()
+            ceiling = emblab_distribution_ceiling[n].item()
+            nextVecToPush.append([ nextTensor[n].item(), floor, ceiling ])
+
+        vectors.append([ '#267', 'e_token_'+str(i), nextVecToPush ])
+    
+    return [ finally_emb_data, vectors ]
 
 def do_minitokenize( mini_input ):
 
@@ -236,12 +285,28 @@ def save_embedding_foo( save_name, weights ):
 
     tokenizer, internal_embs, loaded_embs = get_data()
 
+    results = []
+
+    # if it is a batch processing
+    if save_name == 'for_batch_processing':
+        batchesAsJSON = json.loads( weights )
+        for i in range( len( batchesAsJSON ) ):
+            nextTask = batchesAsJSON[i]
+            nextResults = save_embedding_foo( nextTask[0], nextTask[1] )
+            results.append( nextResults )
+
+        # finally changes after all saves
+        return '\n'.join(results) 
+
+    # if default saving ---
     new_emb_weights = json.loads( weights )
+
+    # print( save_name, new_emb_weights ) 
+
     test = []
     # print ( save_name, new_emb_weights )
     if save_name=='':return 'Filename is empty', None
 
-    results = []
 
     enable_overwrite=False
     anything_saved = False
@@ -274,7 +339,7 @@ def save_embedding_foo( save_name, weights ):
         emb_name, emb_id, emb_vec, loaded_emb = get_embedding_info( name )
         mix_vec = emb_vec.to(device='cpu',dtype=torch.float32)
 
-        print( name, emb_name, emb_id )
+        # print( name, emb_name, emb_id )
 
         maxn = mix_vec.shape[0]
         maxi = mix_vec.shape[1]
@@ -354,6 +419,8 @@ def add_tab():
                         mini_tokenize = gr.Button(value="Tokenize", variant="primary")
                         mini_result = gr.Textbox(label="Tokens", lines=1)
                         mini_result_vectors = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
+                        
+
                     with gr.Row():
                         apply_to_editor = gr.Button( value="Apply to editor", variant="secondary" )
                         
@@ -363,18 +430,33 @@ def add_tab():
                             """)
                         
                     with gr.Row():
-                        combine_embedding = gr.Button( value="Combine embedding", variant="secondary" )
+                        combine_embedding = gr.Button( class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary" )
                         save_name = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
                         save_weights = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
                         save_embedding = gr.Button( value="Save embedding", variant="secondary" )
                         
                     with gr.Row():
-                        saving_process_results = gr.Textbox(label="Logs")
+                        logging_area = gr.Textbox(label="Logs")
+                    
+                    with gr.Row():
+                        embedding_name_input = gr.Textbox(label="Parse and edit embedding", lines=1, placeholder="Enter an embedding name that located in your webui/embeddings folder")
+                    
+                    with gr.Row():
+                        embedding_to_vectors = gr.Button( value="Check and parse Embedding", variant="secondary" )
+                        apply_parsed_emb_to_project = gr.Button( value="Apply parsed to editor", variant="secondary" )
+                        embimport_result_vectors = gr.Textbox(label="Emb Tokens to vectors", lines=1, visible=False )
 
+            # embeddings parsing
+            embedding_to_vectors.click(fn=do_editExistedEmbedding, inputs=embedding_name_input, outputs=[ logging_area, embimport_result_vectors ] )
+            apply_parsed_emb_to_project.click(fn=None, _js="emblab_js_update_byembvectors", inputs=embimport_result_vectors, outputs=[] )
+
+            # tokenizer processing
             mini_tokenize.click(fn=do_minitokenize, inputs=mini_input, outputs=[ mini_result, mini_result_vectors ])
-            apply_to_editor.click(fn=None, _js="emblab_js_update", inputs=[ mini_result, mini_result_vectors ], outputs=[] )
+            apply_to_editor.click(fn=None, _js="emblab_js_update", inputs=mini_result_vectors, outputs=[] )
+
+            # workspace combining and saving
             combine_embedding.click(fn=None, _js="emblab_js_save_embedding", inputs=None, outputs=[ save_name, save_weights ] )
-            save_embedding.click(fn=save_embedding_foo, inputs=[ save_name, save_weights ], outputs=saving_process_results )
+            save_embedding.click(fn=save_embedding_foo, inputs=[ save_name, save_weights ], outputs=logging_area )
 
     return [(ui, "EmbLab", "emblab")]
 
