@@ -160,6 +160,8 @@ let EmbLabEditor_MousedownEventHolder = null;
 // let TokensCombinerEventListener = null;
 // let LIST_OF_TOKENS = {};
 
+const EMBLAB_EMBSURFING_TASKS_LIST = [];
+
 class EmblabAppContextMenu {
 
 	constructor( element ){
@@ -236,6 +238,7 @@ class EmblabApp{
 		this.el_rowsholder_combined = toHTML( `<div></div>`);
 		this.el_rowsholder_combined_container.appendChild( this.el_rowsholder_combined );
 
+		this.isEmbSurfingState = false;
 
 		this.rows = [];
 		this.rows_modifyed = [];
@@ -250,6 +253,26 @@ class EmblabApp{
 		};
 
 		this.init();
+	}
+
+	getEmbSurfingData(){
+		let data = [
+			'for_batch_processing',
+			[]
+		];
+		this.API.forEachRows( ( i, row ) => {
+			const nextTestEmbSave = [
+				this.getEmbeddingNameForCreation() + '_' + row.tagname.replace('</w>', '_w'),
+				JSON.stringify([[
+					row.tagname,
+					row.tagid,
+					row.weights
+				]])
+			];
+			data[1].push( nextTestEmbSave );
+		});
+		data[1] = JSON.stringify( data[1] );
+		return data;
 	}
 
 	serializeProjectData(){
@@ -293,7 +316,8 @@ class EmblabApp{
 		this.el_menu_buttons_line = toHTML(`
 			<div>
 				<button title="Save project" class="emblab_menu_save">💾 save project</button>
-				<button title="Load project" class="emblab_menu_load">📁 load project</button> 
+				<button title="Load project" class="emblab_menu_load">📁 load project</button>
+				<button title="save every token of embeding as separate embedding for analize it" class="emblab_menu_embsurfing">@ emb surfing</button>
 			</div>
 		`);
 		this.el_menu_save_button = this.el_menu_buttons_line.querySelector('.emblab_menu_save');
@@ -318,6 +342,16 @@ class EmblabApp{
 					this.applyLoadedData( rows );
 				}
 			} );
+		});
+
+		this.el_menu_embsurf_button = this.el_menu_buttons_line.querySelector('.emblab_menu_embsurfing');
+		this.el_menu_embsurf_button.addEventListener( 'click', () => {
+			this.isEmbSurfingState = !this.isEmbSurfingState;
+			if( this.isEmbSurfingState ){ 
+				this.el_menu_embsurf_button.style.border = '1px #00ff00 solid' 
+			} else {
+				this.el_menu_embsurf_button.style.border = '0px #00ff00 solid' 
+			}
 		});
 
 		this.el_menu.appendChild( this.el_menu_buttons_line );
@@ -443,7 +477,7 @@ class EmblabApp{
 		}
 	}
 
-	applyData_modifyed( promptString, tokensArray ){
+	applyData_modifyed( tokensArray ){
 		this.resetMixedRowsHTML();
 		this.rows_modifyed = [];
 		let group_index = 0;
@@ -485,7 +519,7 @@ class EmblabApp{
 		}
 	}
 
-	applyData( promptString, tokensArray ){
+	applyData( tokensArray ){
 		this.resetRowsHTML();
 		this.rows = [];
 		let group_index = 0;
@@ -551,7 +585,7 @@ class EmblabApp{
 		}
 
 		this.mixed_data = mixedForModifyed;
-		this.applyData_modifyed( '', this.mixed_data );
+		this.applyData_modifyed( this.mixed_data );
 
 		return mixedForModifyed;
 	}
@@ -1183,7 +1217,7 @@ class EmblabTokenRow {
 
 let message_1 = 'test test test ';
 
-function emblab_js_update( promptString, tokensArray ){
+function emblab_js_update_byembvectors( tokensArray ){
 	let parsedTokenised = [];
 	let error__ = null;
 	try {
@@ -1195,8 +1229,30 @@ function emblab_js_update( promptString, tokensArray ){
 	}
 	if(error__) return false;
 	if(parsedTokenised.length < 1) return false;
-	EmbLabEditor.applyData( promptString, parsedTokenised );
-	
+	for( const nextT of parsedTokenised ){
+		const weights = nextT[2];
+		let min = Infinity, max = -Infinity;
+		const checkMinMax = ( n ) => { min = min < n ? min : n; max = max > n ? max : n; }
+		for( const nextW of weights ) checkMinMax( nextW[0] );
+		for( const nextW of weights ) nextW[1] = min, nextW[2] = max;
+	}
+	EmbLabEditor.applyData( parsedTokenised );
+}
+
+function emblab_js_update( tokensArray ){
+	let parsedTokenised = [];
+	let error__ = null;
+	try {
+		tokensArray = tokensArray.replaceAll("'",'"');
+		parsedTokenised = JSON.parse( tokensArray );
+	} catch( err ){
+		error__ = err;
+		console.warn( err );
+	}
+	if(error__) return false;
+	if(parsedTokenised.length < 1) return false;
+	EmbLabEditor.applyData( parsedTokenised );
+
 }
 
 function send_to_py(){
@@ -1208,7 +1264,14 @@ function receive( somethin ){
 }
 
 function emblab_js_save_embedding() {
-	const forSave = EmbLabEditor.serializeData();
+	let forSave = ['err','[]'];
+	if( EmbLabEditor.isEmbSurfingState ){
+		forSave = EmbLabEditor.getEmbSurfingData();
+	} else {
+		forSave = EmbLabEditor.serializeData();
+	}
+	// console.log( { forSave } );
+	// return forSave;
 	return forSave;
 }
 
