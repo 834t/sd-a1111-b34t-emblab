@@ -766,6 +766,33 @@ class EmblabTokenRow {
 					this.EMBLAB_API.autoSave();
 				}
 			},
+			{
+				title: 'reverse token horizontal',
+				callback: () => {
+					const nextWeights = [];
+					while( this.weights.length ){
+						nextWeights.push( this.weights.pop() );
+					}
+					this.weights = nextWeights;
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			},
+			{
+				title: 'reverse token vertical',
+				callback: () => {
+					for( const nextW of this.weights ){
+						const val = nextW[0];
+						const min = nextW[1];
+						const max = nextW[2];
+						nextW[0] = -val;
+						nextW[1] = -max;
+						nextW[2] = -min;
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			} ,
 		];
 
 		if( this.editState == EMBLAB_ROW_PENCIL_MODE ){
