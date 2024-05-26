@@ -59,7 +59,7 @@ short overview:
 
 # experimental tool for semi-auto mixing of Embedding tokens.
 
-[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
+[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/autogrouping.jpg )] 
 
 
 
