@@ -43,15 +43,21 @@ short overview:
 
 [![VideoReadMe](https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
 
-instruction how to use embedding batch decomposing
+## new features
+
+# instruction how to use embedding batch decomposing
 
 [![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)] 
 
-instruction for abilites to group changes of groupIndex and tokenAccent
+
+
+# instruction for abilites to group changes of groupIndex and tokenAccent
 
 [![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
 
-experimental tool for semi-auto mixing of Embedding tokens.
+
+
+# experimental tool for semi-auto mixing of Embedding tokens.
 
 [![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
 
