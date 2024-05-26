@@ -41,19 +41,19 @@ works only for SD1.5 but who cares, it's just for fun and you can get it ) have 
 
 short overview:
 
-[(https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
+[![VideoReadMe](https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
 
 instruction how to use embedding batch decomposing
 
-[(https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)] 
+[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)] 
 
 instruction for abilites to group changes of groupIndex and tokenAccent
 
-[[VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
+[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
 
 experimental tool for semi-auto mixing of Embedding tokens.
 
-[(https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
+[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
 
 
 
