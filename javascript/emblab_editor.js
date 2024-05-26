@@ -368,8 +368,12 @@ class EmblabApp{
 		this.el_menu_autogroup_line = toHTML(`
 			<div width="100%" style="display: block;">
 				<div title="autuogrouping by token semilarities">
-					preccision:<input width="70" class="emblab_menu_autogrouping_precision" type="number" min="0" max="1" step="0.01" value="0.2" /> 
-					min_limits:<input width="70" class="emblab_menu_autogrouping_minlimits" type="number" min="0" max="3" step="0.01" value="0.75"/> 
+					<span title="The higher the value, the lower the accuracy. More tokens will be merged.">
+						preccision:<input width="70" class="emblab_menu_autogrouping_precision" type="number" min="0" max="1" step="0.01" value="0.2" />
+					</span>
+					<span title="The smaller the value, the lower the threshold for entering the mix zone. A smaller value means more tokens will be mixed.">
+						min_limits:<input width="70" class="emblab_menu_autogrouping_minlimits" type="number" min="0" max="3" step="0.01" value="0.75"/>
+					</span>
 					<button class="emblab_menu_autogroup_button">autogroup</button>
 				</div>	
 			</div>
