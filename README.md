@@ -47,19 +47,20 @@ short overview:
 
 # instruction how to use embedding batch decomposing
 
-[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)] 
+![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)
 
 
 
 # instruction for abilites to group changes of groupIndex and tokenAccent
 
-[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp)] 
+![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp) 
 
 
 
 # experimental tool for semi-auto mixing of Embedding tokens.
 
-[![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/autogrouping.jpg )] 
+![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/autogrouping.jpg)
 
 
-
+# new features
+![20240528](https://github.com/834t/temp/blob/main/imgs/update_features_and_changes2.jpg?raw=true)
