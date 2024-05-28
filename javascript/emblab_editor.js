@@ -326,6 +326,7 @@ class EmblabApp{
 			<div>
 				<button title="Save project" class="emblab_menu_save">💾 save project</button>
 				<button title="Load project" class="emblab_menu_load">📁 load project</button>
+				<button title="Merge loaded project tokens to current tokens" class="emblab_menu_merge">📁+ merge project</button>
 				<button title="save every token of embeding as separate embedding for analize it" class="emblab_menu_embsurfing">@ emb surfing</button>
 			</div>
 		`);
@@ -348,6 +349,31 @@ class EmblabApp{
 					this.setEmbeddingNameForCreation( data.name || '' );
 					this.setEmbeddingStepForCreation( data.step || 0 );
 					const rows = data.rows;
+					this.applyLoadedData( rows );
+				}
+			} );
+		});
+
+		this.el_menu_merge_button = this.el_menu_buttons_line.querySelector('.emblab_menu_merge');
+		this.el_menu_merge_button.addEventListener( 'click', () => {
+			EmbLab_JSON_weights.load( ( data ) => {
+				const isTagData = data.tagname && data.tagid;
+				if( data.type === EMBLAB_PROJECT_TYPE || isTagData ){
+					const rows = [];
+					this.API.forEachRows( ( i, row ) => {
+						rows.push( {
+							accent: row.getAccent(),
+							group_index: rows.length,
+							tagid: row.tagid,
+							tagname: row.tagname,
+							weights: JSON.parse( JSON.stringify( row.weights ) ),
+						} );
+					} );
+					const rows_for_merge = isTagData ? [ data ] : data.rows || [];
+					for( let i = 0; i < rows_for_merge.length; i++){ 
+						rows_for_merge[i].group_index = i + rows.length;
+						rows.push( rows_for_merge[i] );
+					 }
 					this.applyLoadedData( rows );
 				}
 			} );
@@ -697,6 +723,7 @@ class EmblabTokenRow {
 		this.tagname = tagname;
 		this.tagid = tagid;
 		this.weights = weights;
+		this.initWeights = JSON.parse( JSON.stringify( weights ) );
 		this.group_index = group_index || 1;
 		this.initAccent = accent || 1;
 		
@@ -721,6 +748,10 @@ class EmblabTokenRow {
 		this.editState = null;
 			
 		this.init();
+	}
+
+	restoreInitWeights(){
+		this.weights = JSON.parse( JSON.stringify( this.initWeights ) );
 	}
 
 	vector_floorceiling_to_weight( weight, floor, ceiling ){
@@ -967,6 +998,14 @@ class EmblabTokenRow {
 				this.EMBLAB_API.autoSave();
 			}
 		} );
+		CONTEXT_MENU_OPTIONS.push( {
+			title: 'restore init weights',
+			callback: () => {
+				this.restoreInitWeights();
+				this.EMBLAB_API.autoSave();
+				this.drawWeights();
+			}
+		} );
 
 		return CONTEXT_MENU_OPTIONS;
 	}
@@ -1060,6 +1099,36 @@ class EmblabTokenRow {
 		} );
 	}
 
+	downsampleWeights( currentWeights ){
+		const data = []; 
+		for( const w of currentWeights ) data.push( w );
+		const numGroups = 48;
+		const groupSize = 16;
+		const result = [];
+		for (let i = 0; i < numGroups; i++) {
+			const start = i * groupSize;
+			const end = start + groupSize;
+			const group = data.slice(start, end);
+			const average = ( group.reduce((sum, value) => sum + value, 0) / groupSize * 2 ) - 0.5;
+			result.push(average);
+		}
+		return { data: result, numGroups, groupSize };
+	}
+
+	drawLineByXY( lineValues = [], color = '#FFFFFF', lineWidth = 1 ){
+		const currentCanHeight = this.options.can_heigh;
+		const getY = ( a ) => { return a * currentCanHeight; };
+		const ctx = this.ctx;
+		ctx.beginPath(); // 
+		ctx.lineWidth = lineWidth;
+		ctx.moveTo( 0, getY( lineValues[0] )); // 
+		ctx.strokeStyle = color;
+		for( const nextXY of lineValues ){
+			ctx.lineTo( nextXY.x, getY( nextXY.y ) ); // Draw a line to (150, 100)
+		}
+		ctx.stroke(); // Render the path
+	}
+
 	drawLine( lineValues = this.data, color = '#FFFFFF', lineWidth = 1 ) {
 		const currentCanHeight = this.options.can_heigh;
 		const getY = ( a ) => { return a * currentCanHeight; };
@@ -1117,6 +1186,18 @@ class EmblabTokenRow {
 			ctx.lineTo( this.selectorEnd, currentCanHeight ); // Draw a line to (150, 100)
 			ctx.stroke(); // Render the path
 		}
+
+		const downsampledLine = this.downsampleWeights( currentWeights );
+		const forDraw = [];
+		for( let i = 0; i <= downsampledLine.numGroups; i++ ) {
+			forDraw.push( { 
+				x: i * downsampledLine.groupSize, 
+				y: downsampledLine.data[i] 
+			} );
+		}
+		forDraw.push( { x: 768, y: 0.5 } );
+		this.drawLineByXY( forDraw, '#00cccc', 1 );
+		
 		// ctx.beginPath(); // 
 		// ctx.lineWidth = 1;
 		// ctx.moveTo( 0,  getY( this.vector_floorceiling_to_weight( this.weights[0][0], this.weights[0][1], this.weights[0][2] ) ) ); // 
