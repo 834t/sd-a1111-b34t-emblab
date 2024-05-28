@@ -70,23 +70,30 @@ const EmbLab_JSON_weights = {
 EmbLab_JSON_weights.init();
 
 const EmblabStyles = `
-	// #emblab_workspace {
-	// 	background-color: #ffffff;
-	// }
+	#emblab_workspace {
+		background-color: #161b21;
+		padding: 15px;
+		border-radius: 15px;
+		display: inline-block;
+	}
 
 	#emblab_workspace_rowsholder,
 	#emblab_workspace_rowsholder_combined {
 		float: left;
-		width: 770px;
+		width: 780px;
 		display: inline-block;
 		min-height: 64px;
-		border: 1px #666666 solid;
+		border: 1px #3e3543 solid;
 		margin: 5px;
+		padding: 5px;
+		border-radius: 7px;
 	}
 
 	#emblab_workspace input {
-		height: 16px;
-		color: #666666; 
+		height: 20px;
+		color: #f3f3f3;
+		background-color: #353e4f;
+		border-radius: 5px;
 	}
 
 	#emblab_workspace_menu div{
@@ -95,6 +102,8 @@ const EmblabStyles = `
 
 	.emblab_workspace_row{
 		margin: 15px 0px;
+		border-top: 1px solid #333;
+		padding-top: 5px;
 	}
 
 	.emblab_workspace_row_menu{
@@ -119,6 +128,7 @@ const EmblabStyles = `
 	.emblab_row_menu_rightmodule{
 		float: right;
 		margin-right: 10px;
+		cursor: pointer;
 	}
 
 	button.selected_row_button{
@@ -148,10 +158,31 @@ const EmblabStyles = `
 		border: 1px #373737 solid;
 		padding: 0px 1px;
 		border-radius: 7px;
+		min-width: 18px;
+		background-color: #353e4f;
+	}
+
+	.emblab_workspace_row_canvasholder canvas{
+		border-top: 1px solid #113;
+		border-bottom: 1px solid #113;
 	}
 
 	#emblab_app_container button:hover {
 		border: 1px #5a5b5a solid;
+	}
+
+	#emblab_app_container input.emblab_rowmenu_mergeble {
+		background-color: #232323 !important;
+		border-radius: 5px;
+		margin-left: 7px;
+		cursor: pointer;
+	}
+	#emblab_app_container input.emblab_rowmenu_mergeble:checked {
+		background-color: #005555 !important;
+		color: #55cc55 !important;
+	}
+	span.emblab_rowmenu_separator{
+		color: rgba(255, 255, 255, 0.1) !important;
 	}
 `;
 
@@ -320,7 +351,9 @@ class EmblabApp{
 	buildMenu(){
 		this.el_new_embedding_name = toHTML( `<div>new embedding name: <input id="emblab_editor_new_embedding_name" type="text" /></div>`);
 		this.el_menu.appendChild( this.el_new_embedding_name );
-		this.el_new_embedding_step = toHTML( `<div>| new embedding step: <input title="for training" id="emblab_editor_new_embedding_step" type="number" min="0" step="1" value="0"/></div>`);
+		this.el_new_embedding_step = toHTML( `<div>
+			new embedding step: <input title="for training" id="emblab_editor_new_embedding_step" type="number" min="0" step="1" value="0"/>
+			</div>`);
 		this.el_menu.appendChild( this.el_new_embedding_step );
 		this.el_menu_buttons_line = toHTML(`
 			<div>
@@ -530,6 +563,8 @@ class EmblabApp{
 						nextRows.push( duplicatedRow );
 					}
 				}
+				this.rows = nextRows;
+				this.API.autoSave();
 			}
 		}
 	}
@@ -659,10 +694,12 @@ class EmblabApp{
 		const filteredByGroup = {};
 
 		for( const nextRow of this.rows ){
+			if( !nextRow.mergeAvailable ) continue;
 			const groupID = nextRow.getGroupIndex();
 			const weights = nextRow.getWeights();
 			const token = nextRow.tagname;
 			const tokenID = nextRow.tagid;
+
 			if(!( groupID in filteredByGroup ) ) filteredByGroup[ groupID ] = [];
 
 			filteredByGroup[ groupID ].push( [ groupID, weights, token, tokenID ] );
@@ -726,6 +763,7 @@ class EmblabTokenRow {
 		this.initWeights = JSON.parse( JSON.stringify( weights ) );
 		this.group_index = group_index || 1;
 		this.initAccent = accent || 1;
+		this.mergeAvailable = true;
 		
 		this.el = toHTML( `<div class="emblab_workspace_row" title="${tagname}:${tagid}"></div>`);
 		this.el_menu = toHTML(`<div class="emblab_workspace_row_menu" style="width:100%"></div>`);
@@ -735,7 +773,7 @@ class EmblabTokenRow {
 		this.can = document.createElement('canvas');
 		this.can.width = 768;
 		this.can.height = this.EXRECTED_CAN_HEIGHT;
-		this.can.style = 'display:inline-block;background-color:#000000;';
+		this.can.style = 'display:inline-block;background-color:#0b121e;';
 		this.ctx = this.can.getContext('2d');
 
 		this.options = {
@@ -1102,8 +1140,8 @@ class EmblabTokenRow {
 	downsampleWeights( currentWeights ){
 		const data = []; 
 		for( const w of currentWeights ) data.push( w );
-		const numGroups = 48;
-		const groupSize = 16;
+		const groupSize = 8;
+		const numGroups = 768 / groupSize;
 		const result = [];
 		for (let i = 0; i < numGroups; i++) {
 			const start = i * groupSize;
@@ -1258,7 +1296,9 @@ class EmblabTokenRow {
 		const pencilDrawMode_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_pencil_edit');
 		const zonalEditMode_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_zonal_edit');
 		const removeRow_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_remove_row');
-		// const duplicate_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_duplicate');
+		const mergeble_checkbox = this.el_menu_right_module.querySelector('.emblab_rowmenu_mergeble');
+		const emblab_row_name = this.el_menu_left_module.querySelector('.emblab_row_name');
+		const duplicate_button = this.el_menu_right_module.querySelector('.emblab_rowmenu_duplicate'); 
 
 
 		canHeightUp_button.addEventListener( 'click', () => {
@@ -1281,10 +1321,14 @@ class EmblabTokenRow {
 			EmbLab_JSON_weights.save( this.serializeRowData(), this.tagname );
 			this.EMBLAB_API.autoSave();
 		} );
-
 		const isASourceRow = this.EMBLAB_API.isASourceRow( this );
 		if(!isASourceRow) return false;
 
+		emblab_row_name.addEventListener( 'input', () => {
+			this.tagname = emblab_row_name.innerText;
+			this.EMBLAB_API.autoSave();
+		});
+		// -----------------------------------------------------------------------
 		this.el_menu.addEventListener( 'contextmenu', ( event ) => {
 			event.preventDefault();
 			event.stopPropagation();
@@ -1325,9 +1369,21 @@ class EmblabTokenRow {
 			this.EMBLAB_API.removeRow( this );
 		} );
 
-		// duplicate_button.addEventListener( 'click', () => {
-		// 	this.EMBLAB_API.duplicate( this );
-		// } );
+		mergeble_checkbox.addEventListener( 'click', () => {
+			const checked = !!mergeble_checkbox.checked;
+			console.log({
+				checked
+			});
+			if( checked ){
+				this.mergeAvailable = true;
+			} else {
+				this.mergeAvailable = false;
+			}
+		} );
+
+		duplicate_button.addEventListener( 'click', () => {
+			this.EMBLAB_API.duplicate( this );
+		} );
 
 	}
 
@@ -1336,7 +1392,7 @@ class EmblabTokenRow {
 		const s = this.selectorStart;
 		const e = this.selectorEnd;
 		const w = this.selectorEnd - this.selectorStart;
-		selection_monitor.innerText = `[ start: ${s} | end ${e} | width: ${w} ]`;
+		selection_monitor.innerText = `[${s}>${e}]${Math.abs(w)}`;
 	}
 
 	buildMenu(){
@@ -1346,10 +1402,19 @@ class EmblabTokenRow {
 		if( isASourceRow ){
 			this.el_menu_left_module = toHTML(`
 				<div class="emblab_row_menu_leftmodule">
-					<div class="emblab_row_menu_info">${this.tagname}:${this.tagid}</div>
-					<div>group: | <input class="emblab_row_group" type="number" min="0" max="150" step="1" value="${this.group_index || 0 }"/></div>
-					<div>accent: | <input class="emblab_row_accent" type="number" min="0.1" max="10" step="0.1" value="1"/></div>
-					<div class="selection_monitor"></div>
+					<div class="emblab_row_menu_info" style="position: relative;">
+						<span contenteditable="true" title="editable name for token ${this.tagid}" class="emblab_row_name">${this.tagname}</span>
+					</div>
+					<div>
+						<span class="emblab_rowmenu_separator">|</span> 
+						group <input class="emblab_row_group" type="number" min="0" max="150" step="1" value="${this.group_index || 0 }"/>
+					</div>
+					<div>
+						<span class="emblab_rowmenu_separator">|</span> 
+						accent <input class="emblab_row_accent" type="number" min="0.1" max="10" step="0.1" value="1"/>
+						<span class="emblab_rowmenu_separator">|</span>
+					</div>
+					<div  style="font-size:12px; font-family: monospace;" class="selection_monitor"></div>
 				</div>
 			`);
 			this.el_menu_left_module.querySelector('.emblab_row_accent').value = this.initAccent;
@@ -1374,20 +1439,26 @@ class EmblabTokenRow {
 			this.el_menu_right_module = toHTML(`
 				<div class="emblab_row_menu_rightmodule">
 					<button title="Zoom in" class="emblab_rowmenu_height_up">&#x1F50D;+</button>
-					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button> || 
+					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button>
+					<span class="emblab_rowmenu_separator">|</span> 
 					<button title="Save weights" class="emblab_rowmenu_save_w">💾</button>
-					<button title="Load weight" class="emblab_rowmenu_load_w">📁</button> || 
-					<button title="Duplicate row" class="emblab_rowmenu_duplicate">&#x2398;</button> ||
+					<button title="Load weight" class="emblab_rowmenu_load_w">📁</button>
+					<span class="emblab_rowmenu_separator">|</span> 
+					<button title="Duplicate row" class="emblab_rowmenu_duplicate">&#x2398;</button>
+					<span class="emblab_rowmenu_separator">|</span> 
 					<button title="Pencil edit mode" class="emblab_rowmenu_pencil_edit">&#x270E;</button>
-					<button title="Zonal edit mode" class="emblab_rowmenu_zonal_edit">&#x2334;</button> ||
+					<button title="Zonal edit mode" class="emblab_rowmenu_zonal_edit">&#x2334;</button>
+					<span class="emblab_rowmenu_separator">|</span> 
 					<button title="Remove row" class="emblab_rowmenu_remove_row"> X </button>
+					<input title="add to merge" class="emblab_rowmenu_mergeble" type="checkbox" checked="checked" />
 				</div>
 			`);
 		} else {
 			this.el_menu_right_module = toHTML(`
 				<div class="emblab_row_menu_rightmodule">
 					<button title="Zoom in" class="emblab_rowmenu_height_up">&#x1F50D;+</button>
-					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button> || 
+					<button title="Zoom out" class="emblab_rowmenu_height_down">&#x1F50D;-</button>
+					<span class="emblab_rowmenu_separator">|</span> 
 					<button title="Save weights" class="emblab_rowmenu_save_w">💾</button>
 				</div>
 			`);
