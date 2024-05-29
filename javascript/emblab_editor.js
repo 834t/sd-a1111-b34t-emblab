@@ -11,6 +11,18 @@ function toHTML(htmlString) {
 	return div.firstChild;
 }
 
+function calculateWeightsDistance(vector1, vector2) {
+    if (vector1.length !== vector2.length) {
+        throw new Error("Both vectors must have the same number of dimensions.");
+    }
+    let sumOfSquares = 0;
+    for (let i = 0; i < vector1.length; i++) {
+        let difference = vector1[i][0] - vector2[i][0];
+        sumOfSquares += difference * difference;
+    }
+    return Math.sqrt(sumOfSquares);
+}
+
 function dateNow(){
 	const date = new Date();
 	let year = date.getFullYear();
@@ -582,8 +594,7 @@ class EmblabApp{
 			const row_attracted_to = [];
 			for( const rowT of rows ){
 				if( rowT != rowC ){
-					let dist_to = 0;
-					for( let i = 0; i < 768; i++ ) dist_to += getDiff( rowC[1].weights[i][0], rowT[1].weights[i][0] );
+					let dist_to = calculateWeightsDistance( rowC[1].weights, rowT[1].weights );
 					row_attracted_to.push( [ rowT[0], dist_to ] );
 				}
 			}
