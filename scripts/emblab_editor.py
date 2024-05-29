@@ -425,17 +425,6 @@ def add_tab():
                         apply_to_editor = gr.Button( value="Apply to editor", variant="secondary" )
                         
                     with gr.Row():
-                        emblab_editor_container = gr.HTML(f"""
-                            <div id="emblab_app_container" style="" width="100%" height="128"></div>
-                            """)
-                        
-                    with gr.Row():
-                        combine_embedding = gr.Button( class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary" )
-                        save_name = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
-                        save_weights = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
-                        save_embedding = gr.Button( value="Save embedding", variant="secondary" )
-                        
-                    with gr.Row():
                         logging_area = gr.Textbox(label="Logs")
                     
                     with gr.Row():
@@ -445,6 +434,17 @@ def add_tab():
                         embedding_to_vectors = gr.Button( value="Check and parse Embedding", variant="secondary" )
                         apply_parsed_emb_to_project = gr.Button( value="Apply parsed to editor", variant="secondary" )
                         embimport_result_vectors = gr.Textbox(label="Emb Tokens to vectors", lines=1, visible=False )
+
+                    with gr.Row():
+                        combine_embedding = gr.Button( class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary" )
+                        save_name = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
+                        save_weights = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
+                        save_embedding = gr.Button( value="Save embedding", variant="secondary" )
+                        
+                    with gr.Row():
+                        emblab_editor_container = gr.HTML(f"""
+                            <div id="emblab_app_container" style="" width="100%" height="128"></div>
+                            """)
 
             # embeddings parsing
             embedding_to_vectors.click(fn=do_editExistedEmbedding, inputs=embedding_name_input, outputs=[ logging_area, embimport_result_vectors ] )
