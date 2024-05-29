@@ -436,26 +436,31 @@ class EmblabApp{
 
 		this.el_menu.appendChild( this.el_menu_buttons_line );
 
+		/* 
+			<span title="The higher the value, the lower the accuracy. More tokens will be merged.">
+				preccision:<input width="70" class="emblab_menu_autogrouping_precision" type="number" min="0" max="1" step="0.01" value="0.2" />
+			</span>
+			<span title="The smaller the value, the lower the threshold for entering the mix zone. A smaller value means more tokens will be mixed.">
+				min_limits:<input width="70" class="emblab_menu_autogrouping_minlimits" type="number" min="0" max="3" step="0.01" value="0.75"/>
+			</span>
+		*/
+
 		this.el_menu_autogroup_line = toHTML(`
 			<div width="100%" style="display: block;">
 				<div title="autuogrouping by token semilarities">
-					<span title="The higher the value, the lower the accuracy. More tokens will be merged.">
-						preccision:<input width="70" class="emblab_menu_autogrouping_precision" type="number" min="0" max="1" step="0.01" value="0.2" />
-					</span>
-					<span title="The smaller the value, the lower the threshold for entering the mix zone. A smaller value means more tokens will be mixed.">
-						min_limits:<input width="70" class="emblab_menu_autogrouping_minlimits" type="number" min="0" max="3" step="0.01" value="0.75"/>
-					</span>
-					<button class="emblab_menu_autogroup_button">autogroup</button>
+					group by vector distance max: <input class="emblab_menu_autogrouping_minlimits" type="range" min="0" max="1" value="1.01" step="0.01" /> :min 
+					<button class="emblab_menu_autogroup_button"> apply </button>
+					<span class="emblab_menu_autogroup_result"></span>
 				</div>	
 			</div>
 		`);
-		this.el_menu_autogrouping_precision = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogrouping_precision');
+		// this.el_menu_autogrouping_precision = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogrouping_precision');
 		this.el_menu_autogrouping_minlimits = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogrouping_minlimits');
 		this.el_menu_autogroup_button = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_button');
+		this.el_menu_autogroup_result = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_result');
 		this.el_menu_autogroup_button.addEventListener( 'click', () => {
-			const preccision = this.el_menu_autogrouping_precision.value || 0.1;
-			const min_limits = this.el_menu_autogrouping_minlimits.value || 0.75;
-			this.groupRowsBySimilarities( preccision, min_limits );
+			const min_limits = 1 - this.el_menu_autogrouping_minlimits.value || -0.01;
+			this.groupRowsByVectorDistances( min_limits );
 		});
 		this.el_menu.appendChild( this.el_menu_autogroup_line );
 	}
@@ -581,58 +586,60 @@ class EmblabApp{
 		}
 	}
 	
-	groupRowsBySimilarities( precision_alpha = 0.3, min_limits = 0.75 ){
-		const rows = [];
+	groupRowsByVectorDistances( min_limits = 1 ){
+
+		const clastering_rows = [];
 		this.API.forEachRows( ( i, row ) => {
-			rows.push( [ i, row ] );
+			clastering_rows.push( [ [ i, row ] ] );
 		} );
 
-		const getDiff = ( v1, v2 ) => { return  Math.max( v1, v2 ) - Math.min( v1, v2 ); }
+		const rowsForClastering_before = clastering_rows.length;
 
-		const semilarities_table = [];
-		for( const rowC of rows ){
-			const row_attracted_to = [];
-			for( const rowT of rows ){
-				if( rowT != rowC ){
-					let dist_to = calculateWeightsDistance( rowC[1].weights, rowT[1].weights );
-					row_attracted_to.push( [ rowT[0], dist_to ] );
-				}
-			}
-			let min = Infinity;
-			let max = -Infinity;
-			for( const r of row_attracted_to ) min=r[1]<min?r[1]:min, max=r[1]>max?r[1]:max;
-			row_attracted_to.sort( ( a, b ) => { return a[1] - b[1]; } );
-			semilarities_table.push( { index: rowC[0], sims: row_attracted_to, min, max, range: max - min } );
-		}
-		semilarities_table.sort( ( a, b ) => { return b.range - a.range; });
+		let minDist = Infinity;
+		let maxDist = -Infinity;
 
-		const byGroups = {};
-		const usedGroups = {};
-
-		// console.log( semilarities_table );
-		// console.log( byGroups );
-
-		for( const nextGroup of semilarities_table ) {
-			if( nextGroup.index in usedGroups ) continue;
-			const nextPack = { index: nextGroup.index, forMerge: [] };
-			byGroups[ nextGroup.index ] = nextPack;
-			usedGroups[ nextGroup.index ] = true;
-			const { min, max, range } = nextGroup;
-			if( range < ( min * min_limits ) ){ continue; }
-			for( const nextSim of nextGroup.sims ){
-				const distAlpha = (nextSim[1] - min ) / range;
-				if( distAlpha < precision_alpha ){
-					nextPack.forMerge.push( nextSim[0] );
-					usedGroups[ nextSim[0] ] = true;
+		for( const r1 of clastering_rows ){
+			for( const r2 of clastering_rows ){
+				if( r1 != r2 ){
+					const d = calculateWeightsDistance( r1[0][1].weights, r2[0][1].weights );
+					if( d != 0 ){
+						minDist = minDist < d ? minDist : d;
+						maxDist = maxDist > d ? maxDist : d;
+					}
 				}
 			}
 		}
+		let rangeDist = maxDist - minDist;
 
-		for( const groupLeaderID in byGroups ){
-			const grp = byGroups[ groupLeaderID ]; 
-			rows[groupLeaderID][1].setGroupIndex( groupLeaderID );
-			for( const toChange of grp.forMerge ){
-				rows[toChange][1].setGroupIndex( groupLeaderID );
+		for( const nextClaster of clastering_rows ){
+			for( const nextClaster2 of clastering_rows ){
+				if( nextClaster2.length == 1 && nextClaster != nextClaster2 ){
+					let minDistTo = {
+						dist: Infinity,
+						claster: null,
+					};
+					for( const clasterRow of nextClaster ){
+						const dist = calculateWeightsDistance( clasterRow[1].weights, nextClaster2[0][1].weights );
+						if( dist < minDistTo.dist ){
+							minDistTo.dist = dist;
+							minDistTo.claster = nextClaster;
+						}
+					}
+					let distInRange = minDistTo.dist - minDist;
+					if( ( distInRange / rangeDist ) < min_limits ){
+						nextClaster.push( nextClaster2.shift() );
+					}
+				}
+			}
+		}
+
+		const _clasters = clastering_rows.filter( ( a ) => { return a.length > 0; } );
+
+		this.el_menu_autogroup_result.innerText = `< ${ rowsForClastering_before } rows to ${ _clasters.length } clastered groups >`;
+
+		for( let i = 0; i < _clasters.length; i++ ){
+			for( const nextR of _clasters[i] ){
+				nextR[1].setGroupIndex( i );
 			}
 		}
 
