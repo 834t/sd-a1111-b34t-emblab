@@ -414,26 +414,33 @@ def add_tab():
             with gr.Row():
 
                 with gr.Column(variant='panel'):
-                    mini_input = gr.Textbox(label="Mini tokenizer", lines=1, placeholder="Enter a short prompt (loaded embeddings or modifiers are not supported)")
                     with gr.Row():
-                        mini_tokenize = gr.Button(value="Tokenize", variant="primary")
-                        mini_result = gr.Textbox(label="Tokens", lines=1)
-                        mini_result_vectors = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
-                        
+
+                        with gr.Column():
+
+                            mini_input = gr.Textbox(label="Mini tokenizer", lines=1, placeholder="Enter a short prompt (loaded embeddings or modifiers are not supported)")
+                    
+                            with gr.Row():
+                                mini_tokenize = gr.Button(value="Tokenize", variant="primary")
+                                mini_result = gr.Textbox(label="Tokens", lines=1)
+                                mini_result_vectors = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
+                                
+                            with gr.Row():
+                                apply_to_editor = gr.Button( value="Apply to editor", variant="secondary" )
+                            
+                        with gr.Column():
+                            
+                            embedding_name_input = gr.Textbox( label="Textual Inversion extractor", lines=1, placeholder="Enter an embedding name that located in your webui/embeddings folder")
+                                
+                            with gr.Row():
+                                embedding_to_vectors = gr.Button( label="Parse embedding", value="Check and parse Embedding", variant="secondary" )
+
+                            with gr.Row():
+                                apply_parsed_emb_to_project = gr.Button( value="Apply parsed to editor", variant="secondary" )
+                                embimport_result_vectors = gr.Textbox( label="Emb Tokens to vectors", lines=1, visible=False )
 
                     with gr.Row():
-                        apply_to_editor = gr.Button( value="Apply to editor", variant="secondary" )
-                        
-                    with gr.Row():
                         logging_area = gr.Textbox(label="Logs")
-                    
-                    with gr.Row():
-                        embedding_name_input = gr.Textbox(label="Parse and edit embedding", lines=1, placeholder="Enter an embedding name that located in your webui/embeddings folder")
-                    
-                    with gr.Row():
-                        embedding_to_vectors = gr.Button( value="Check and parse Embedding", variant="secondary" )
-                        apply_parsed_emb_to_project = gr.Button( value="Apply parsed to editor", variant="secondary" )
-                        embimport_result_vectors = gr.Textbox(label="Emb Tokens to vectors", lines=1, visible=False )
 
                     with gr.Row():
                         combine_embedding = gr.Button( class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary" )
