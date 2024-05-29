@@ -296,6 +296,8 @@ class EmblabApp{
 		this.rows_modifyed = [];
 		this.mixed_data = [];
 
+		this.rowsMixedByClasters = [];
+
 		this.clipboard = {
 			start: 0,
 			end: 0,
@@ -447,8 +449,8 @@ class EmblabApp{
 
 		this.el_menu_autogroup_line = toHTML(`
 			<div width="100%" style="display: block;">
-				<div title="autuogrouping by token semilarities">
-					group by vector distance max: <input class="emblab_menu_autogrouping_minlimits" type="range" min="0" max="1" value="1.01" step="0.01" /> :min 
+				<div title="group tokens by vector distance">
+					 max: <input style="width: 500px;" class="emblab_menu_autogrouping_minlimits" type="range" min="0" max="1" value="1.001" step="0.001" /> :min 
 					<button class="emblab_menu_autogroup_button"> apply </button>
 					<span class="emblab_menu_autogroup_result"></span>
 				</div>	
@@ -458,9 +460,13 @@ class EmblabApp{
 		this.el_menu_autogrouping_minlimits = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogrouping_minlimits');
 		this.el_menu_autogroup_button = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_button');
 		this.el_menu_autogroup_result = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_result');
-		this.el_menu_autogroup_button.addEventListener( 'click', () => {
-			const min_limits = 1 - this.el_menu_autogrouping_minlimits.value || -0.01;
+		this.el_menu_autogrouping_minlimits.addEventListener( 'input', () => {
+			const min_limits = 1 - this.el_menu_autogrouping_minlimits.value || -0.001;
+			this.el_menu_autogrouping_minlimits.title = `current limits: ${min_limits}`;
 			this.groupRowsByVectorDistances( min_limits );
+		} );
+		this.el_menu_autogroup_button.addEventListener( 'click', () => {
+			this.applyClsteredGroups();
 		});
 		this.el_menu.appendChild( this.el_menu_autogroup_line );
 	}
@@ -550,6 +556,7 @@ class EmblabApp{
 					this.rows_modifyed = nextRows;
 					this.el_rowsholder_combined.removeChild( row.el );
 				}
+				this.resetClasters();
 				this.API.autoSave();
 			},
 			isASourceRow: ( row ) => {
@@ -581,12 +588,17 @@ class EmblabApp{
 					}
 				}
 				this.rows = nextRows;
+				this.resetClasters();
 				this.API.autoSave();
 			}
 		}
 	}
+
+	resetClasters(){
+		this.rowsMixedByClasters = [];
+	}
 	
-	groupRowsByVectorDistances( min_limits = 1 ){
+	groupRowsByVectorDistances( min_limits = -0.001 ){
 
 		const clastering_rows = [];
 		this.API.forEachRows( ( i, row ) => {
@@ -635,14 +647,22 @@ class EmblabApp{
 
 		const _clasters = clastering_rows.filter( ( a ) => { return a.length > 0; } );
 
+		this.rowsMixedByClasters = _clasters;
+
 		this.el_menu_autogroup_result.innerText = `< ${ rowsForClastering_before } rows to ${ _clasters.length } clastered groups >`;
 
+
+	}
+
+	applyClsteredGroups(){
+		if( !this.rowsMixedByClasters.length ) this.groupRowsByVectorDistances();
+		const _clasters =  this.rowsMixedByClasters;
+		if( !_clasters.length ) return false;
 		for( let i = 0; i < _clasters.length; i++ ){
 			for( const nextR of _clasters[i] ){
 				nextR[1].setGroupIndex( i );
 			}
 		}
-
 	}
 
 	applyData_modifyed( tokensArray ){
@@ -663,6 +683,8 @@ class EmblabApp{
 			this.rows_modifyed.push( nextRow );
 			group_index++;
 		}
+		this.resetClasters();
+		this.API.autoSave();
 	}
 
 
@@ -705,6 +727,7 @@ class EmblabApp{
 			this.rows.push( nextRow );
 			group_index++;
 		}
+		this.resetClasters();
 		this.API.autoSave();
 	}
 
