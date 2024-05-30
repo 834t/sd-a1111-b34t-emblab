@@ -1,7 +1,7 @@
 // EmbLab extension for AUTOMATIC1111/stable-diffusion-webui
 //
 // https://github.com/834t/sd-a1111-b34t-emblab
-// version 0.8 - 2024-05-19
+// version 0.9 - 2024-05-30
 //
 
 // util
@@ -94,7 +94,7 @@ const EmblabStyles = `
 	#emblab_workspace_rowsholder,
 	#emblab_workspace_rowsholder_combined {
 		float: left;
-		width: 780px;
+		width: 830px;
 		display: inline-block;
 		min-height: 64px;
 		border: 1px #3e3543 solid;
@@ -102,6 +102,31 @@ const EmblabStyles = `
 		padding: 5px;
 		border-radius: 7px;
 	}
+
+	.emblab_rowsholder{
+		max-height: 500px;
+		overflow-y: scroll;
+		overflow-x: hidden;
+	}
+
+	.emblab_rowsholder::-webkit-scrollbar-track {
+		border: 1px solid #000;
+		padding: 2px 0;
+		background-color: #404040;
+		border-radius:5px;
+	  }
+	  
+	.emblab_rowsholder::-webkit-scrollbar {
+		width: 10px;
+	}
+	
+	.emblab_rowsholder::-webkit-scrollbar-thumb {
+		border-radius: 10px;
+		box-shadow: inset 0 0 6px rgba(0,0,0,.3);
+		background-color: #737272;
+		border: 1px solid #000;
+	}
+
 
 	#emblab_workspace input {
 		height: 20px;
@@ -127,6 +152,16 @@ const EmblabStyles = `
 	.emblab_workspace_row_menu div{
 		display: inline-block;
 	}
+
+	.emblab_workspace_row_menu button{
+		font-size: 8px;
+		padding: 1px 3px !important;
+	}
+	
+	.emblab_workspace_row_menu button.selected_row_button{
+		color: #9bff9e !important;
+		background-color: #ff6a00 !important;
+	}
 	
 	.emblab_row_menu_leftmodule{
 		float: left;
@@ -143,10 +178,6 @@ const EmblabStyles = `
 		float: right;
 		margin-right: 10px;
 		cursor: pointer;
-	}
-
-	button.selected_row_button{
-		color: #00FF00 !important;
 	}
 
 	.emblab_editor_context_menu{
@@ -201,8 +232,9 @@ const EmblabStyles = `
 `;
 
 const EMBLAB_PROJECT_TYPE = 'EMBLAB_PROJECT';
-const EMBLAB_MIN_CAN_HEIGHT = 32;
-let EMBLAB_CURRENT_CAN_HEIGHT = EMBLAB_MIN_CAN_HEIGHT;
+const EMBLAB_MIN_CAN_HEIGHT = 0;
+const EMBLAB_CAN_ZOOM_STEP = 16;
+const EMBLAB_START_CAN_HEIGHT = 32;
 const EMBLAB_MAX_CAN_HEIGHT = 256;
 
 const EMBLAB_ROW_PENCIL_MODE = 'pencil';
@@ -285,11 +317,23 @@ class EmblabApp{
 
 		this.el = toHTML( `<div id="emblab_workspace"></div> `);
 		this.el_menu = toHTML( `<div id="emblab_workspace_menu"></div>`);
-		this.el_rowsholder_container = toHTML( `<div id="emblab_workspace_rowsholder">source tokens:<br/></div>`);
-		this.el_rowsholder = toHTML( `<div></div>`);
+		this.el_rowsholder_container = toHTML( `<div id="emblab_workspace_rowsholder"></div>`);
+		this.el_rowsholder_container_menu = toHTML( `
+			<div class="emblab_rowsholder_headmenu" > 
+				<span>source tokens:</span> 
+			</div>
+		`);
+		this.el_rowsholder_container.appendChild( this.el_rowsholder_container_menu );
+		this.el_rowsholder = toHTML( `<div class="emblab_rowsholder"></div>`);
 		this.el_rowsholder_container.appendChild( this.el_rowsholder );
-		this.el_rowsholder_combined_container = toHTML( `<div id="emblab_workspace_rowsholder_combined">combined tokens:<br/></div>`);
-		this.el_rowsholder_combined = toHTML( `<div></div>`);
+		this.el_rowsholder_combined_container = toHTML( `<div id="emblab_workspace_rowsholder_combined"></div>`);
+		this.el_rowsholder_combined_menu = toHTML( `
+			<div class="emblab_rowsholder_headmenu" > 
+				<span>combined tokens:</span> 
+			</div>
+		`);
+		this.el_rowsholder_combined_container.appendChild( this.el_rowsholder_combined_menu );
+		this.el_rowsholder_combined = toHTML( `<div class="emblab_rowsholder"></div>`);
 		this.el_rowsholder_combined_container.appendChild( this.el_rowsholder_combined );
 
 		this.isEmbSurfingState = false;
@@ -436,9 +480,9 @@ class EmblabApp{
 		this.el_menu_embsurf_button.addEventListener( 'click', () => {
 			this.isEmbSurfingState = !this.isEmbSurfingState;
 			if( this.isEmbSurfingState ){ 
-				this.el_menu_embsurf_button.style.border = '1px #00ff00 solid' 
+				this.el_menu_embsurf_button.style.border = '1px #00ff00 solid'; 
 			} else {
-				this.el_menu_embsurf_button.style.border = '0px #00ff00 solid' 
+				this.el_menu_embsurf_button.style.border = '0px #00ff00 solid';
 			}
 		});
 
@@ -891,7 +935,7 @@ class EmblabTokenRow {
 		this.ctx = this.can.getContext('2d');
 
 		this.options = {
-			can_heigh: EMBLAB_MIN_CAN_HEIGHT,
+			can_height: EMBLAB_START_CAN_HEIGHT,
 		};
 
 		this.selectorStart = 0;
@@ -1151,6 +1195,16 @@ class EmblabTokenRow {
 			}
 		} );
 		CONTEXT_MENU_OPTIONS.push( {
+			title: 'this row zoom to all',
+			callback: () => {
+				this.EMBLAB_API.forEachRows( ( i, row ) => {
+					row.options.can_height = this.options.can_height;
+					row.can.height = row.options.can_height;
+					row.drawWeights();
+				} );
+			}
+		} );
+		CONTEXT_MENU_OPTIONS.push( {
 			title: 'this row merge status to all',
 			callback: () => {
 				this.EMBLAB_API.forEachRows( ( i, row ) => {
@@ -1214,7 +1268,7 @@ class EmblabTokenRow {
 		};
 
 		const processEditEvent = ( event ) => {
-			const currentCanHeight = this.options.can_heigh;
+			const currentCanHeight = this.options.can_height;
 			if( this.editState == EMBLAB_ROW_PENCIL_MODE ){
 				const { x, y } = XY_by_event( event );
 				const value = ( currentCanHeight - y ) / currentCanHeight;
@@ -1279,7 +1333,7 @@ class EmblabTokenRow {
 	}
 
 	drawLineByXY( lineValues = [], color = '#FFFFFF', lineWidth = 1 ){
-		const currentCanHeight = this.options.can_heigh;
+		const currentCanHeight = this.options.can_height;
 		const getY = ( a ) => { return a * currentCanHeight; };
 		const ctx = this.ctx;
 		ctx.beginPath(); // 
@@ -1293,7 +1347,7 @@ class EmblabTokenRow {
 	}
 
 	drawLine( lineValues = this.data, color = '#FFFFFF', lineWidth = 1 ) {
-		const currentCanHeight = this.options.can_heigh;
+		const currentCanHeight = this.options.can_height;
 		const getY = ( a ) => { return a * currentCanHeight; };
 		const ctx = this.ctx;
 		ctx.beginPath(); // 
@@ -1307,7 +1361,13 @@ class EmblabTokenRow {
 	}
 
 	drawWeights(){
-		const currentCanHeight = this.options.can_heigh;
+
+		// no need to redraw if canvas zero height
+		if( this.options.can_height == 0 ) {
+			return false;
+		}
+		
+		const currentCanHeight = this.options.can_height;
 		const getY = ( a ) => { return currentCanHeight - ( a * ( currentCanHeight / 2) ); };
 		const ctx = this.ctx;
 		ctx.clearRect( 0, 0, 768, currentCanHeight );
@@ -1427,17 +1487,17 @@ class EmblabTokenRow {
 
 
 		canHeightUp_button.addEventListener( 'click', () => {
-			if( this.options.can_heigh < EMBLAB_MAX_CAN_HEIGHT ){
-				this.options.can_heigh += EMBLAB_MIN_CAN_HEIGHT;
-				this.can.height = this.options.can_heigh;
+			if( this.options.can_height < EMBLAB_MAX_CAN_HEIGHT ){
+				this.options.can_height += EMBLAB_CAN_ZOOM_STEP;
+				this.can.height = this.options.can_height;
 				this.drawWeights();
 			}
 		} );
 
 		canHeightDown_button.addEventListener( 'click', () => {
-			if( this.options.can_heigh > EMBLAB_MIN_CAN_HEIGHT ){
-				this.options.can_heigh -= EMBLAB_MIN_CAN_HEIGHT;
-				this.can.height = this.options.can_heigh;
+			if( this.options.can_height > EMBLAB_MIN_CAN_HEIGHT ){
+				this.options.can_height -= EMBLAB_CAN_ZOOM_STEP;
+				this.can.height = this.options.can_height;
 				this.drawWeights();
 			}
 		} );
