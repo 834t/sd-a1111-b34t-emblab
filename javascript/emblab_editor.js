@@ -1418,7 +1418,7 @@ class EmblabTokenRow {
 		ctx.moveTo( 0, getY( lineValues[0] )); // 
 		ctx.strokeStyle = color;
 		for( const nextXY of lineValues ){
-			ctx.lineTo( nextXY.x, getY( nextXY.y ) ); // Draw a line to (150, 100)
+			ctx.lineTo( nextXY.x + 0.5, getY( nextXY.y ) + 0.5 ); // Draw a line to (150, 100)
 		}
 		ctx.stroke(); // Render the path
 	}
@@ -1432,7 +1432,7 @@ class EmblabTokenRow {
 		ctx.moveTo( 0, getY( lineValues[0] )); // 
 		ctx.strokeStyle = color;
 		for( let i = 1; i < 768; i++ ){
-			ctx.lineTo( i, getY( lineValues[i]) ); // Draw a line to (150, 100)
+			ctx.lineTo( i + 0.5, getY( lineValues[i]) + 0.5 ); // Draw a line to (150, 100)
 		}
 		ctx.stroke(); // Render the path
 	}
