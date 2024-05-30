@@ -1,8 +1,85 @@
 // EmbLab extension for AUTOMATIC1111/stable-diffusion-webui
 //
 // https://github.com/834t/sd-a1111-b34t-emblab
-// version 0.9 - 2024-05-30
+// version 0.8 - 2024-05-19
 //
+
+const CANVAS_BG_PATTERN = (()=>{
+	const can = document.createElement('canvas');
+	const ctx = can.getContext('2d');
+	const patternColor = '#055';
+
+	const width = 64;
+	const height = 16;
+
+	can.width = width;
+	can.height = height;
+	ctx.beginPath(); // 
+	ctx.strokeStyle = patternColor;
+	ctx.lineWidth = 0.5;
+
+	const dashConfig = [];
+	const dotSize = 2;
+	const gapSize = 6;
+	let pointer = 0;
+	while( pointer < width ){  
+		dashConfig.push( dotSize ); pointer += dotSize;
+		dashConfig.push( gapSize ); pointer += gapSize;
+	}
+	ctx.setLineDash( dashConfig );
+	ctx.moveTo( 0, height / 2 - 0.5 );
+	ctx.lineTo( width, height / 2 - 0.5 );
+	ctx.stroke(); 
+	
+	ctx.beginPath(); // 
+	ctx.setLineDash([ ]);
+	ctx.moveTo( 0 + 0.5, 0 );
+	ctx.lineTo( 0 + 0.5, height );
+
+	ctx.stroke(); 
+	return ctx.createPattern( can, "repeat" );
+
+})();
+
+const CANVAS_ZONE_PATTERN = (()=>{
+	const can = document.createElement('canvas');
+	const ctx = can.getContext('2d');
+	const width = 64;
+	const height = 16;
+
+	const patternColor = '#055';
+
+
+	can.width = width;
+	can.height = height;
+	ctx.strokeStyle = patternColor;
+	ctx.lineWidth = 0.5;
+
+	ctx.fillStyle = '#0b121e';
+	ctx.fillRect( 0, 0, width, height );
+
+	const dashConfig = [];
+	const dotSize = 6;
+	const gapSize = 10;
+	let pointer = 0;
+	while( pointer < width ){  
+		dashConfig.push( dotSize ); pointer += dotSize;
+		dashConfig.push( gapSize ); pointer += gapSize;
+	}
+	ctx.setLineDash( dashConfig );
+	ctx.beginPath(); // 
+	ctx.moveTo( 0, height / 2 - 0.5 );
+	ctx.lineTo( width, height / 2 - 0.5 );
+	ctx.stroke(); 
+	
+	ctx.beginPath(); // 
+	ctx.setLineDash( [] );
+	ctx.moveTo( 0 + 0.5, 0 );
+	ctx.lineTo( 0 + 0.5, height );
+	ctx.stroke(); 
+	return ctx.createPattern( can, "repeat" );
+
+})();
 
 // util
 function toHTML(htmlString) {
@@ -931,7 +1008,7 @@ class EmblabTokenRow {
 		this.can = document.createElement('canvas');
 		this.can.width = 768;
 		this.can.height = this.EXRECTED_CAN_HEIGHT;
-		this.can.style = 'display:inline-block;background-color:#0b121e;';
+		this.can.style = 'display:inline-block;background-color:#000;';
 		this.ctx = this.can.getContext('2d');
 
 		this.options = {
@@ -1371,9 +1448,13 @@ class EmblabTokenRow {
 		const getY = ( a ) => { return currentCanHeight - ( a * ( currentCanHeight / 2) ); };
 		const ctx = this.ctx;
 		ctx.clearRect( 0, 0, 768, currentCanHeight );
+		ctx.fillStyle = CANVAS_BG_PATTERN;
+		ctx.fillRect( 0, 0, 768, currentCanHeight );
 
 		if( this.editState == EMBLAB_ROW_ZONAL_MODE ){
-			ctx.fillStyle = '#777799';
+			// ctx.fillStyle = '#777799';
+			ctx.fillStyle = CANVAS_ZONE_PATTERN;
+			// ctx.fillStyle = ctx.createPattern( SELECTED_ZONE_PATTERN, "repeat" );
 			let _zoneWidth = Math.abs(this.selectorEnd - this.selectorStart);
 			ctx.fillRect( this.selectorStart, 0, _zoneWidth, currentCanHeight );
 		}
@@ -1382,31 +1463,44 @@ class EmblabTokenRow {
 		this.forEachWeights( ( index, getVal, setVal ) => {
 			currentWeights[index] = getVal();
 		} );
-		this.drawLine( currentWeights, '#FF0000', 1 );
+		this.drawLine( currentWeights, '#f33', 1 );
 
 
 		const whiteZeroLine = [];
 		for( let i = 0; i < 768; i++ ){
 			whiteZeroLine.push(0.5);
 		}
-		this.drawLine( whiteZeroLine, '#cccccc', 0.5 );
+		this.drawLine( whiteZeroLine, '#ccc', 0.5 );
 
 		if( this.editState != EMBLAB_ROW_PENCIL_MODE ){
 			// draw Selector Start => 
 			ctx.beginPath(); // 
 			ctx.lineWidth = 1;
-			ctx.strokeStyle = '#00FF00';
-			ctx.moveTo( this.selectorStart, 0 ); // 
-			ctx.lineTo( this.selectorStart, currentCanHeight ); // Draw a line to (150, 100)
+			ctx.strokeStyle = '#3f3';
+			ctx.moveTo( this.selectorStart - 0.5, 0 ); // 
+			ctx.lineTo( this.selectorStart - 0.5, currentCanHeight ); // 
+
+			if( this.editState == EMBLAB_ROW_ZONAL_MODE ){
+				ctx.moveTo( this.selectorStart - 0.5, 1.5 ); // 
+				ctx.lineTo( this.selectorStart - 0.5 - 3, 1.5 ); // 
+				ctx.moveTo( this.selectorStart - 0.5, currentCanHeight - 1.5 ); // 
+				ctx.lineTo( this.selectorStart - 0.5 - 3, currentCanHeight - 1.5 ); // 
+			}
+
 			ctx.stroke(); // Render the path
 		}
 
 		if( this.editState == EMBLAB_ROW_ZONAL_MODE ){
 			ctx.beginPath(); // 
 			ctx.lineWidth = 1;
-			ctx.strokeStyle = '#0000FF';
-			ctx.moveTo( this.selectorEnd, 0 ); // 
-			ctx.lineTo( this.selectorEnd, currentCanHeight ); // Draw a line to (150, 100)
+			ctx.strokeStyle = '#f83';
+			ctx.moveTo( this.selectorEnd + 0.5, 0 ); // 
+			ctx.lineTo( this.selectorEnd + 0.5, currentCanHeight ); // 
+
+			ctx.moveTo( this.selectorEnd + 0.5, 1.5 ); // 
+			ctx.lineTo( this.selectorEnd + 0.5 + 3, 1.5 ); // 
+			ctx.moveTo( this.selectorEnd + 0.5, currentCanHeight - 1.5 ); // 
+			ctx.lineTo( this.selectorEnd + 0.5 + 3, currentCanHeight - 1.5 ); //
 			ctx.stroke(); // Render the path
 		}
 
@@ -1535,19 +1629,23 @@ class EmblabTokenRow {
 		const removeSelections = () => {
 			pencilDrawMode_button.classList.remove('selected_row_button');
 			zonalEditMode_button.classList.remove('selected_row_button');
-			this.drawWeights();
 		};
 
 		pencilDrawMode_button.addEventListener( 'click', () => {
 			this.editState = ( this.editState === EMBLAB_ROW_PENCIL_MODE ) ? null : EMBLAB_ROW_PENCIL_MODE;
 			removeSelections();
 			if( this.editState === EMBLAB_ROW_PENCIL_MODE ) pencilDrawMode_button.classList.add('selected_row_button');
+			this.drawWeights();
 		} );
 
 		zonalEditMode_button.addEventListener( 'click', () => {
 			this.editState = ( this.editState === EMBLAB_ROW_ZONAL_MODE ) ? null : EMBLAB_ROW_ZONAL_MODE;
 			removeSelections();
-			if( this.editState === EMBLAB_ROW_ZONAL_MODE ) zonalEditMode_button.classList.add('selected_row_button');
+			if( this.editState === EMBLAB_ROW_ZONAL_MODE ) {
+				if( this.selectorEnd < this.selectorStart ) this.selectorEnd = this.selectorStart;
+				zonalEditMode_button.classList.add('selected_row_button');
+			}
+			this.drawWeights();
 		} );
 
 		removeRow_button.addEventListener( 'click', () => {
