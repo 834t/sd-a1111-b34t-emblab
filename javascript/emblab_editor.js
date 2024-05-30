@@ -11,13 +11,15 @@ function toHTML(htmlString) {
 	return div.firstChild;
 }
 
-function calculateWeightsDistance(vector1, vector2) {
+function calculateWeightsDistance(vector1, vector2, v1SimpleArray , v2SimpleArray ) {
     if (vector1.length !== vector2.length) {
         throw new Error("Both vectors must have the same number of dimensions.");
     }
     let sumOfSquares = 0;
     for (let i = 0; i < vector1.length; i++) {
-        let difference = vector1[i][0] - vector2[i][0];
+		const v1 = v1SimpleArray ? vector1[i] : vector1[i][0];
+		const v2 = v2SimpleArray ? vector2[i] : vector2[i][0];
+        let difference = v1 - v2;
         sumOfSquares += difference * difference;
     }
     return Math.sqrt(sumOfSquares);
@@ -358,8 +360,12 @@ class EmblabApp{
 	}
 
 	autosaveProjectData(){
-		const serializedData = this.serializeProjectData();
-		localStorage.setItem('EMBLAB_PROJECT', JSON.stringify( serializedData ));
+		try {
+			const serializedData = this.serializeProjectData();
+			localStorage.setItem('EMBLAB_PROJECT', JSON.stringify( serializedData ));
+		} catch( err ){
+			console.warn( err );
+		}
 	}
 
 	buildMenu(){
@@ -460,7 +466,7 @@ class EmblabApp{
 		this.el_menu_autogrouping_minlimits = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogrouping_minlimits');
 		this.el_menu_autogroup_button = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_button');
 		this.el_menu_autogroup_result = this.el_menu_autogroup_line.querySelector('.emblab_menu_autogroup_result');
-		this.el_menu_autogrouping_minlimits.addEventListener( 'input', () => {
+		this.el_menu_autogrouping_minlimits.addEventListener( 'change', () => {
 			const min_limits = 1 - this.el_menu_autogrouping_minlimits.value || -0.001;
 			this.el_menu_autogrouping_minlimits.title = `current limits: ${min_limits}`;
 			this.groupRowsByVectorDistances( min_limits );
@@ -623,29 +629,93 @@ class EmblabApp{
 		}
 		let rangeDist = maxDist - minDist;
 
-		for( const nextClaster of clastering_rows ){
-			for( const nextClaster2 of clastering_rows ){
-				if( nextClaster2.length == 1 && nextClaster != nextClaster2 ){
-					let minDistTo = {
-						dist: Infinity,
-						claster: null,
-					};
-					for( const clasterRow of nextClaster ){
-						const dist = calculateWeightsDistance( clasterRow[1].weights, nextClaster2[0][1].weights );
-						if( dist < minDistTo.dist ){
-							minDistTo.dist = dist;
-							minDistTo.claster = nextClaster;
+		const clasterMap = new Map();
+
+		// each clasters to find nearest
+		for( const nextClasterForMerge of clastering_rows ){
+
+			// search only for singleElement clasters
+			if( nextClasterForMerge.length == 1 ){
+
+				let minDistTo = {
+					minDistanceToVecotr: Infinity,
+					maxDistanceToVecotr: -Infinity,
+					midDistanceToVecotr: 0,
+					midDistanceToAllVectors: 0,
+					distToClasterCetnter: 0,
+					centroidVector: [],
+					claster: null,
+				};
+
+				// each claster
+				for( const nextClaster of clastering_rows ){
+					if( nextClaster != nextClasterForMerge && nextClaster.length > 0 ){
+
+						let totalDistToClasterVectors = 0;
+						let minD = Infinity;
+						let maxD = -Infinity;
+						const centroidVector = [];
+	
+						for( const clasterRow of nextClaster ){
+							// combine centr of claster
+							for( let i = 0; i < clasterRow[1].weights.length; i++ ){
+								if( !centroidVector[ i ] ) centroidVector[ i ] = 0;
+								centroidVector[ i ] += clasterRow[1].weights[i][0];
+							}
+							// calculate distance to current vector of claster
+							const dist = calculateWeightsDistance( clasterRow[1].weights, nextClasterForMerge[0][1].weights );
+							// calculate total distance
+							totalDistToClasterVectors += dist;
+							// calculate minmax
+							minD = minD > dist ? dist : minD;
+							maxD = maxD < dist ? dist : maxD;
 						}
-					}
-					let distInRange = minDistTo.dist - minDist;
-					if( ( distInRange / rangeDist ) < min_limits ){
-						nextClaster.push( nextClaster2.shift() );
+						// combine center of claster
+						for( let i = 0; i < centroidVector.length; i++ ){ 
+							centroidVector[i] /= centroidVector.length 
+						}
+	
+						// calculate distances
+						const minDistanceToVecotr = minD;
+						const maxDistanceToVecotr = maxD;
+						const midDistanceToVecotr = minD + ( maxD - minD ) / 2;
+						const midDistanceToAllVectors = totalDistToClasterVectors / nextClaster.length;
+						const distToClasterCetnter = calculateWeightsDistance( centroidVector, nextClasterForMerge[0][1].weights, true );
+	
+						const nextminDistToData = {
+							minDistanceToVecotr,
+							maxDistanceToVecotr,
+							midDistanceToVecotr,
+							midDistanceToAllVectors,
+							distToClasterCetnter,
+							centroidVector,
+							claster: nextClaster,
+						}
+	
+						if( minDistanceToVecotr < minDistTo.minDistanceToVecotr ){
+							minDistTo = nextminDistToData;
+						}
+
+
 					}
 				}
+
+				let distInRange = minDistTo.minDistanceToVecotr - minDist;
+
+				const nearestVectorInClasterAvailable = ( distInRange / rangeDist ) < min_limits;
+				
+				if( nearestVectorInClasterAvailable ){
+					clasterMap.set( minDistTo.claster, minDistTo );
+					minDistTo.claster.push( nextClasterForMerge.shift() );
+				}
+
 			}
+
 		}
 
 		const _clasters = clastering_rows.filter( ( a ) => { return a.length > 0; } );
+
+		console.log( { clasterMap, _clasters } );
 
 		this.rowsMixedByClasters = _clasters;
 
@@ -657,6 +727,9 @@ class EmblabApp{
 	applyClsteredGroups(){
 		if( !this.rowsMixedByClasters.length ) this.groupRowsByVectorDistances();
 		const _clasters =  this.rowsMixedByClasters;
+		console.log( {
+			_clasters
+		} );
 		if( !_clasters.length ) return false;
 		for( let i = 0; i < _clasters.length; i++ ){
 			for( const nextR of _clasters[i] ){
@@ -1073,6 +1146,17 @@ class EmblabTokenRow {
 				const currentAccent = this.getAccent();
 				this.EMBLAB_API.forEachRows( ( i, row ) => {
 					row.setAccent( currentAccent );
+				} );
+				this.EMBLAB_API.autoSave();
+			}
+		} );
+		CONTEXT_MENU_OPTIONS.push( {
+			title: 'this row merge status to all',
+			callback: () => {
+				this.EMBLAB_API.forEachRows( ( i, row ) => {
+					if( row.mergeAvailable != this.mergeAvailable ){
+						row.el_menu_right_module.querySelector('.emblab_rowmenu_mergeble').dispatchEvent( new MouseEvent('click') );
+					}
 				} );
 				this.EMBLAB_API.autoSave();
 			}
