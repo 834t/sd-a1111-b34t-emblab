@@ -4,6 +4,8 @@
 // version 0.8 - 2024-05-19
 //
 
+
+
 const CANVAS_BG_PATTERN = (()=>{
 	const can = document.createElement('canvas');
 	const ctx = can.getContext('2d');
@@ -102,6 +104,22 @@ function calculateWeightsDistance(vector1, vector2, v1SimpleArray , v2SimpleArra
     return Math.sqrt(sumOfSquares);
 }
 
+function cosineSimilarityDistance(vec1, vec2) {
+	if (vec1.length !== vec2.length) {
+		console.log( { vec1, vec2 } );
+		throw new Error('Vectors must be of the same length');
+	}
+	let dotProduct = 0;
+	let normA = 0;
+	let normB = 0;
+	for (let i = 0; i < 768; i++) {
+		dotProduct += vec1[i] * vec2[i];
+		normA += vec1[i] ** 2;
+		normB += vec2[i] ** 2;
+	}
+	return 1 - ( ( dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)) ) + 1 ) / 2;
+}
+
 function dateNow(){
 	const date = new Date();
 	let year = date.getFullYear();
@@ -145,6 +163,7 @@ const EmbLab_JSON_weights = {
 		} );
 		fr.onload = () => {
 			let nextJSON = null;
+			loadInput.value = null;
 			try {
 				nextJSON = JSON.parse( this.fr.result );
 			} catch( err ){
@@ -443,7 +462,7 @@ class EmblabApp{
 				JSON.stringify([[
 					row.tagname,
 					row.tagid,
-					row.weights
+					row.getWeights()
 				]])
 			];
 			data[1].push( nextTestEmbSave );
@@ -540,7 +559,7 @@ class EmblabApp{
 							group_index: rows.length,
 							tagid: row.tagid,
 							tagname: row.tagname,
-							weights: JSON.parse( JSON.stringify( row.weights ) ),
+							weights: JSON.parse( JSON.stringify( row.getWeights() ) ),
 						} );
 					} );
 					const rows_for_merge = isTagData ? [ data ] : data.rows || [];
@@ -701,7 +720,7 @@ class EmblabApp{
 					{
 						tagid: row.tagid, 
 						tagname: row.tagname, 
-						weights: JSON.parse(JSON.stringify( row.weights )), 
+						weights: JSON.parse(JSON.stringify( row.getWeights() )), 
 						group_index: row.group_index, 
 					},
 					this.API,
@@ -729,7 +748,11 @@ class EmblabApp{
 
 		const clastering_rows = [];
 		this.API.forEachRows( ( i, row ) => {
-			clastering_rows.push( [ [ i, row ] ] );
+			const weights = new Float32Array( 768 );
+			for( let i = 0; i < 768; i++ ){ 
+				weights[i] = row.getWeight(i) 
+			}
+			clastering_rows.push( [ [ i, row, weights ] ] );
 		} );
 
 		const rowsForClastering_before = clastering_rows.length;
@@ -740,7 +763,7 @@ class EmblabApp{
 		for( const r1 of clastering_rows ){
 			for( const r2 of clastering_rows ){
 				if( r1 != r2 ){
-					const d = calculateWeightsDistance( r1[0][1].weights, r2[0][1].weights );
+					const d = cosineSimilarityDistance( r1[0][2], r2[0][2] );
 					if( d != 0 ){
 						minDist = minDist < d ? minDist : d;
 						maxDist = maxDist > d ? maxDist : d;
@@ -764,7 +787,7 @@ class EmblabApp{
 					midDistanceToVecotr: 0,
 					midDistanceToAllVectors: 0,
 					distToClasterCetnter: 0,
-					centroidVector: [],
+					centroidVector: new Float32Array(768),
 					claster: null,
 				};
 
@@ -775,16 +798,18 @@ class EmblabApp{
 						let totalDistToClasterVectors = 0;
 						let minD = Infinity;
 						let maxD = -Infinity;
-						const centroidVector = [];
+						const centroidVector = new Float32Array(768);
 	
 						for( const clasterRow of nextClaster ){
 							// combine centr of claster
-							for( let i = 0; i < clasterRow[1].weights.length; i++ ){
+							for( let i = 0; i < 768; i++ ){
 								if( !centroidVector[ i ] ) centroidVector[ i ] = 0;
-								centroidVector[ i ] += clasterRow[1].weights[i][0];
+								centroidVector[i] += clasterRow[2][i];
 							}
+
 							// calculate distance to current vector of claster
-							const dist = calculateWeightsDistance( clasterRow[1].weights, nextClasterForMerge[0][1].weights );
+							const dist = cosineSimilarityDistance( clasterRow[2], nextClasterForMerge[0][2] );
+							
 							// calculate total distance
 							totalDistToClasterVectors += dist;
 							// calculate minmax
@@ -793,7 +818,7 @@ class EmblabApp{
 						}
 						// combine center of claster
 						for( let i = 0; i < centroidVector.length; i++ ){ 
-							centroidVector[i] /= centroidVector.length 
+							centroidVector[i] /= nextClaster.length;
 						}
 	
 						// calculate distances
@@ -801,7 +826,7 @@ class EmblabApp{
 						const maxDistanceToVecotr = maxD;
 						const midDistanceToVecotr = minD + ( maxD - minD ) / 2;
 						const midDistanceToAllVectors = totalDistToClasterVectors / nextClaster.length;
-						const distToClasterCetnter = calculateWeightsDistance( centroidVector, nextClasterForMerge[0][1].weights, true );
+						const distToClasterCetnter = cosineSimilarityDistance( centroidVector, nextClasterForMerge[0][2] );
 	
 						const nextminDistToData = {
 							minDistanceToVecotr,
@@ -812,7 +837,7 @@ class EmblabApp{
 							centroidVector,
 							claster: nextClaster,
 						}
-	
+
 						if( minDistanceToVecotr < minDistTo.minDistanceToVecotr ){
 							minDistTo = nextminDistToData;
 						}
@@ -848,9 +873,7 @@ class EmblabApp{
 	applyClsteredGroups(){
 		if( !this.rowsMixedByClasters.length ) this.groupRowsByVectorDistances();
 		const _clasters =  this.rowsMixedByClasters;
-		console.log( {
-			_clasters
-		} );
+		console.log( { _clasters } );
 		if( !_clasters.length ) return false;
 		for( let i = 0; i < _clasters.length; i++ ){
 			for( const nextR of _clasters[i] ){
@@ -994,8 +1017,9 @@ class EmblabTokenRow {
 
 		this.tagname = tagname;
 		this.tagid = tagid;
-		this.weights = weights;
 		this.initWeights = JSON.parse( JSON.stringify( weights ) );
+		this.weights = new Float32Array( 768 * 3 );
+		this.restoreInitWeights();
 		this.group_index = group_index || 1;
 		this.initAccent = accent || 1;
 		this.mergeAvailable = true;
@@ -1023,8 +1047,37 @@ class EmblabTokenRow {
 		this.init();
 	}
 
+	getWeight( i ){
+		return this.weights[ i * 3];
+	}
+
+	setWeight( i, val ){
+		this.weights[ i * 3] = val;
+	}
+
+	getMin( i ){
+		return this.weights[ i * 3 + 1];
+	}
+
+	setMin( i, val ){
+		this.weights[ i * 3 + 1 ] = val;
+	}
+
+	getMax( i ){
+		return this.weights[ i * 3 + 2];
+	}
+
+	setMax( i, val ){
+		this.weights[ i * 3 + 2 ] = val;
+	}
+
 	restoreInitWeights(){
-		this.weights = JSON.parse( JSON.stringify( this.initWeights ) );
+		const weights = JSON.parse( JSON.stringify( this.initWeights ) );
+		for( let i = 0; i < weights.length; i++ ){
+			this.weights[i * 3 ] = weights[i][0];
+			this.weights[i * 3 + 1] = weights[i][1];
+			this.weights[i * 3 + 2] = weights[i][2];
+		}
 	}
 
 	vector_floorceiling_to_weight( weight, floor, ceiling ){
@@ -1032,33 +1085,21 @@ class EmblabTokenRow {
 	}
 
 	setDataByIndexAndAlpha( i, a ){
-		const min = parseFloat( this.weights[i][1] );
-		const max = parseFloat( this.weights[i][2] );
-		const range = max - min;
-		this.weights[i][0] = min + range * a;
+		this.setWeight( i, this.getMin(i) + ( this.getMax(i) - this.getMin(i) ) * a );
 	}
 
 	getDataByIndexAsAlpha( i ){
-		const min = parseFloat( this.weights[i][1] );
-		const max = parseFloat( this.weights[i][2] );
-		const val = parseFloat( this.weights[i][0] );
-		const range = max - min;
-		const val_to_get = ( val - min ) / range;
-		return val_to_get;
+		return ( this.getWeight(i) - this.getMin(i) ) / ( this.getMax(i) - this.getMin(i) );
 	}
 
 	forEachWeights( callBack ){
 		for( let i = 0; i < 768; i++ ){
-			const min = parseFloat( this.weights[i][1] );
-			const max = parseFloat( this.weights[i][2] );
-			const val = parseFloat( this.weights[i][0] );
-			const range = max - min;
 			callBack( 
 				i,
-				() => {
+				() => { // getVal
 					return this.getDataByIndexAsAlpha( i );
 				}, 
-				( a ) => {
+				( a ) => { // setVal
 					this.setDataByIndexAndAlpha( i, a );
 				}
 			);
@@ -1068,7 +1109,27 @@ class EmblabTokenRow {
 	contextmenu_for_canvas(){
 		let CONTEXT_MENU_OPTIONS = [
 			{
-				title: 'copy to clipboard',
+				title: 'token to clipboard',
+				callback: () => {
+					const weights_to_clipboard = {
+						start: 0,
+						end: 767,
+						width: 767,
+						weights: [],
+						accent: this.getAccent(),
+					};
+					if( weights_to_clipboard.width > 0 ){
+						for( let i = this.selectorStart; i < this.selectorEnd; i++ ){
+							weights_to_clipboard.weights.push( 
+								[ this.getWeight(i), this.getMin(i), this.getMax(i) ]
+							);
+						}
+						this.EMBLAB_API.setClipboard( weights_to_clipboard );
+					}
+				}
+			},
+			{
+				title: 'selected to clipboard',
 				callback: () => {
 					const weights_to_clipboard = {
 						start: this.selectorStart,
@@ -1080,7 +1141,7 @@ class EmblabTokenRow {
 					if( weights_to_clipboard.width > 0 ){
 						for( let i = this.selectorStart; i < this.selectorEnd; i++ ){
 							weights_to_clipboard.weights.push( 
-								JSON.parse( JSON.stringify( this.weights[ i ] ) )
+								[ this.getWeight(i), this.getMin(i), this.getMax(i) ]
 							);
 						}
 						this.EMBLAB_API.setClipboard( weights_to_clipboard );
@@ -1093,22 +1154,10 @@ class EmblabTokenRow {
 					const currentClipboard = this.EMBLAB_API.getClipboard();
 					for( let i = 0; i < currentClipboard.weights.length; i++ ){
 						const nextPosition = i + currentClipboard.start;
-						if( this.weights[ nextPosition ] ){
-							this.weights[ nextPosition ] = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) )
-						}
-					}
-					this.drawWeights();
-					this.EMBLAB_API.autoSave();
-				}
-			},
-			{
-				title: 'replace at selector position',
-				callback: () => {
-					const currentClipboard = this.EMBLAB_API.getClipboard();
-					for( let i = 0; i < currentClipboard.weights.length; i++ ){
-						const nextPosition = i + this.selectorStart;
-						if( this.weights[ nextPosition ] ){
-							this.weights[ nextPosition ] = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) )
+						if(  nextPosition < 768  ){
+							this.setWeight( nextPosition, currentClipboard.weights[ i ][0] );
+							// this.setMin( nextPosition, currentClipboard.weights[ i ][1] );
+							// this.setMax( nextPosition, currentClipboard.weights[ i ][2] );
 						}
 					}
 					this.drawWeights();
@@ -1122,15 +1171,60 @@ class EmblabTokenRow {
 					for( let i = 0; i < currentClipboard.weights.length; i++ ){
 						const nextPosition = i + currentClipboard.start;
 						if( this.weights[ nextPosition ] ){
-							const currentVal = this.weights[ nextPosition ];
-							const clipboardVal = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) );
-							const finallyVal = [
-								( currentVal[ 0 ] + ( clipboardVal[0] * currentClipboard.accent ) ) / 2,
-								( currentVal[ 1 ] + ( clipboardVal[1] * currentClipboard.accent ) ) / 2,
-								( currentVal[ 2 ] + ( clipboardVal[2] * currentClipboard.accent ) ) / 2,
-							];
-		
-							this.weights[ nextPosition ] = finallyVal;
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, ( this.getWeight( nextPosition ) + ( clipboardVal[0] * currentClipboard.accent ) ) / 2 );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
+						}
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			},
+			{
+				title: 'sub at clipboard position',
+				callback: () => {
+					const currentClipboard = this.EMBLAB_API.getClipboard();
+					for( let i = 0; i < currentClipboard.weights.length; i++ ){
+						const nextPosition = i + currentClipboard.start;
+						if( this.weights[ nextPosition ] ){
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, this.getWeight( nextPosition ) - clipboardVal[0] );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
+						}
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			},
+			{
+				title: 'add at clipboard position',
+				callback: () => {
+					const currentClipboard = this.EMBLAB_API.getClipboard();
+					for( let i = 0; i < currentClipboard.weights.length; i++ ){
+						const nextPosition = i + currentClipboard.start;
+						if( this.weights[ nextPosition ] ){
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, this.getWeight( nextPosition ) + clipboardVal[0] );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
+						}
+					}
+					this.drawWeights();
+					this.EMBLAB_API.autoSave();
+				}
+			},
+			{
+				title: 'replace at selector position',
+				callback: () => {
+					const currentClipboard = this.EMBLAB_API.getClipboard();
+					for( let i = 0; i < currentClipboard.weights.length; i++ ){
+						const nextPosition = i + this.selectorStart;
+						if( nextPosition < 768 ){
+							this.setWeight( nextPosition, currentClipboard.weights[ i ][0] );
+							// this.setMin( nextPosition, currentClipboard.weights[ i ][1] );
+							// this.setMax( nextPosition, currentClipboard.weights[ i ][2] );
 						}
 					}
 					this.drawWeights();
@@ -1144,15 +1238,10 @@ class EmblabTokenRow {
 					for( let i = 0; i < currentClipboard.weights.length; i++ ){
 						const nextPosition = i + this.selectorStart;
 						if( this.weights[ nextPosition ] ){
-							const currentVal = this.weights[ nextPosition ];
-							const clipboardVal = JSON.parse( JSON.stringify( currentClipboard.weights[ i ] ) );
-							const finallyVal = [
-								( currentVal[ 0 ] + ( clipboardVal[0] * currentClipboard.accent ) ) / 2,
-								( currentVal[ 1 ] + ( clipboardVal[1] * currentClipboard.accent ) ) / 2,
-								( currentVal[ 2 ] + ( clipboardVal[2] * currentClipboard.accent ) ) / 2,
-							];
-		
-							this.weights[ nextPosition ] = finallyVal;
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, ( this.getWeight( nextPosition ) + ( clipboardVal[0] * currentClipboard.accent ) ) / 2 );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
 						}
 					}
 					this.drawWeights();
@@ -1160,57 +1249,91 @@ class EmblabTokenRow {
 				}
 			},
 			{
-				title: 'reverse token horizontal',
+				title: 'sub at selector position',
 				callback: () => {
-					const nextWeights = [];
-					while( this.weights.length ){
-						nextWeights.push( this.weights.pop() );
+					const currentClipboard = this.EMBLAB_API.getClipboard();
+					for( let i = 0; i < currentClipboard.weights.length; i++ ){
+						const nextPosition = i + this.selectorStart;
+						if( this.weights[ nextPosition ] ){
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, this.getWeight( nextPosition ) - clipboardVal[0] );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
+						}
 					}
-					this.weights = nextWeights;
 					this.drawWeights();
 					this.EMBLAB_API.autoSave();
 				}
 			},
 			{
-				title: 'reverse token vertical',
+				title: 'add at selector position',
 				callback: () => {
-					for( const nextW of this.weights ){
-						const val = nextW[0];
-						const min = nextW[1];
-						const max = nextW[2];
-						nextW[0] = -val;
-						nextW[1] = -max;
-						nextW[2] = -min;
+					const currentClipboard = this.EMBLAB_API.getClipboard();
+					for( let i = 0; i < currentClipboard.weights.length; i++ ){
+						const nextPosition = i + this.selectorStart;
+						if( this.weights[ nextPosition ] ){
+							const clipboardVal = currentClipboard.weights[ i ];
+							this.setWeight( nextPosition, this.getWeight( nextPosition ) + clipboardVal[0] );
+							// this.setMin( nextPosition, ( this.getMin( nextPosition ) + ( clipboardVal[1] * currentClipboard.accent ) ) / 2 );
+							// this.setMax( nextPosition, ( this.getMax( nextPosition ) + ( clipboardVal[2] * currentClipboard.accent ) ) / 2 );
+						}
 					}
 					this.drawWeights();
 					this.EMBLAB_API.autoSave();
 				}
-			} ,
+			},
+			// {
+			// 	title: 'reverse token horizontal',
+			// 	callback: () => {
+			// 		const nextWeights = [];
+			// 		while( this.weights.length ){
+			// 			nextWeights.push( this.weights.pop() );
+			// 		}
+			// 		this.weights = nextWeights;
+			// 		this.drawWeights();
+			// 		this.EMBLAB_API.autoSave();
+			// 	}
+			// },
+			// {
+			// 	title: 'reverse token vertical',
+			// 	callback: () => {
+			// 		for( const nextW of this.weights ){
+			// 			const val = nextW[0];
+			// 			const min = nextW[1];
+			// 			const max = nextW[2];
+			// 			nextW[0] = -val;
+			// 			nextW[1] = -max;
+			// 			nextW[2] = -min;
+			// 		}
+			// 		this.drawWeights();
+			// 		this.EMBLAB_API.autoSave();
+			// 	}
+			// } ,
 		];
 
 		if( this.editState == EMBLAB_ROW_PENCIL_MODE ){
 			CONTEXT_MENU_OPTIONS.push( {
 				title: 'all weights to mid',
 				callback: () => {
-					for( const nextW of this.weights ){
-						nextW[0] = nextW[1] + ( ( nextW[2] - nextW[1] ) / 2 )
-					} 
+					for( let i = 0; i < 768; i++ ){
+						this.setWeight( i, ( this.getMin(i) + ( this.getMax( i ) - this.getMin( i ) ) / 2 ) );
+					}
 					this.drawWeights();
 					this.EMBLAB_API.autoSave();
 				}
 			} );
-			CONTEXT_MENU_OPTIONS.push( {
-				title: 'all weights absolute [0,-1, 1]',
-				callback: () => {
-					for( const nextW of this.weights ){
-						nextW[0] = 0;
-						nextW[1] = -1;
-						nextW[2] = 1;
-					} 
-					this.drawWeights();
-					this.EMBLAB_API.autoSave();
-				}
-			} );
+			// CONTEXT_MENU_OPTIONS.push( {
+			// 	title: 'all weights absolute [0,-1, 1]',
+			// 	callback: () => {
+			// 		for( let i = 0; i < 768; i++ ){
+			// 			this.setWeight( i, 0 );
+			// 			this.setMin( i, -1 );
+			// 			this.setMax( i, 1 );
+			// 		}
+			// 		this.drawWeights();
+			// 		this.EMBLAB_API.autoSave();
+			// 	}
+			// } );
 		}
 
 		// pencil tool additional options
@@ -1219,9 +1342,9 @@ class EmblabTokenRow {
 				title: 'zone weights to mid',
 				callback: () => {
 					const _W = this.weights;
-					for( let i = 0; i < _W.length; i++ ){
+					for( let i = 0; i < 768; i++ ){
 						if( i <= this.selectorEnd && i >= this.selectorStart ){
-							_W[i][0] = _W[i][1] + ( ( _W[i][2] - _W[i][1] ) / 2 );
+							_W[i * 3] = _W[i * 3 + 1] + ( ( _W[i * 3 + 2] - _W[i * 3 + 1] ) / 2 );
 						}
 					}
 					this.drawWeights();
@@ -1232,11 +1355,11 @@ class EmblabTokenRow {
 				title: 'zone weights to absolute [0,-1, 1]',
 				callback: () => {
 					const _W = this.weights;
-					for( let i = 0; i < _W.length; i++ ){
+					for( let i = 0; i < 768; i++ ){
 						if( i <= this.selectorEnd && i >= this.selectorStart ){
-							_W[i][0] = 0;
-							_W[i][1] = -1;
-							_W[i][2] = 1;
+							_W[i * 3 ] = 0;
+							_W[i * 3 + 1] = -1;
+							_W[i * 3 + 2] = 1;
 						}
 					}
 					this.drawWeights();
@@ -1548,19 +1671,17 @@ class EmblabTokenRow {
 	getWeights(){
 		const nextWeights = [];
 		const accent = this.getAccent();
-		for( const nextW of this.weights ){
-			const w = nextW[0] * accent;
-			nextWeights.push( [ w, nextW[1], nextW[2] ] );
+		for( let i = 0; i < 768; i++ ){
+			nextWeights.push( [ this.getWeight(i) * accent, this.getMin(i), this.getMax(i) ] );
 		}
 		return nextWeights;
-		// return parseFloat( this.el_menu_group.querySelector('.emblab_row_accent').value );
 	}
 
 	serializeRowData(){
 		return {
 			tagid: this.tagid, 
 			tagname: this.tagname, 
-			weights: JSON.parse(JSON.stringify( this.weights )), 
+			weights: this.getWeights(), 
 			group_index: this.group_index, 
 			accent: this.getAccent(),
 		};
@@ -1620,7 +1741,8 @@ class EmblabTokenRow {
 
 		emblab_rowmenu_load_w_button.addEventListener( 'click', (  ) => {
 			EmbLab_JSON_weights.load( ( data ) => {
-				this.weights = data.weights;
+				this.initWeights = data.weights;
+				this.restoreInitWeights();
 				this.drawWeights();
 				this.EMBLAB_API.autoSave();
 			} );
@@ -1654,9 +1776,6 @@ class EmblabTokenRow {
 
 		mergeble_checkbox.addEventListener( 'click', () => {
 			const checked = !!mergeble_checkbox.checked;
-			console.log({
-				checked
-			});
 			if( checked ){
 				this.mergeAvailable = true;
 			} else {
@@ -1824,6 +1943,12 @@ function emblab_js_save_embedding() {
 	// console.log( { forSave } );
 	// return forSave;
 	return forSave;
+}
+
+function emblab_js_test_get_all_tokens( a, b, c, d ){
+	console.log( 'emblab_js_test_get_all_tokens', {
+		a, b, c, d
+	} );
 }
 
 onUiUpdate(function(){
