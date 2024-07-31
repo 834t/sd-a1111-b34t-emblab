@@ -2,6 +2,7 @@
 #
 # https://github.com/834t/sd-a1111-b34t-emblab
 # version 0.8 - 2024-05-19
+# tnx for advice with python!: https://github.com/captainzero93
 #
 import json
 import gradio as gr
