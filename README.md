@@ -1,66 +1,61 @@
-# sd-a1111-b34t-emblab
-simple embedding laboratory for stable diffusion a1111 UI (SD1.5 version)
+# SD A1111 B34T EmbLab
 
-original URL: https://github.com/834t/sd-a1111-b34t-emblab
+## Overview
+SD A1111 B34T EmbLab is a simple embedding laboratory extension for the Stable Diffusion A1111 UI (SD1.5 version). This tool allows users to easily modify, merge, and create embeddings using groups of tokens.
 
-Inspired by:
-reuploaded clone: `https://github.com/w-e-w/embedding-inspector`
-of deleted repositoty `https://github.com/tkalayci71/embedding-inspector`
-and 
-`https://github.com/CodeExplode/stable-diffusion-webui-embedding-editor.git`
+## Inspiration
+This project was inspired by:
+- A reuploaded clone: [embedding-inspector](https://github.com/w-e-w/embedding-inspector) of a deleted repository
+- [stable-diffusion-webui-embedding-editor](https://github.com/CodeExplode/stable-diffusion-webui-embedding-editor.git)
 
-it's an embedding laboratory extension where you can easily modify merge and create embeddings by bunch of tokens.
+## Features
+- Merge embeddings by groups of prompts or combine all into one token
+- Zonal editor tool for copying and pasting chunks of weights between tokens
+- Pen tool for "drawing" weights on each token track
+- Ability to change the accent of each token track and combine them into final tokens
+- Save results as an Embedding (Textual Inversion)
 
-There you can merge it by groups of prompt what you have, or merge all into one token.
+## Use Cases
+1. Create a single-token style by merging 4-5 tokens (e.g., "shine shock string detailed sharp")
+2. Use the single-token adjustment to modify your prompt results
+3. Duplicate a "token track," increase its accent, and use the pen tool to create an adjustment track
+4. Combine tokens using parts of other token weights
 
-You have zonal editor tool where you can copy and paste chunks of weights between tokens in your embedding.
+## Notes
+- This tool is designed for SD1.5 but can be used for experimentation and fun
+- The interface may appear complex, resembling a sound editor
+- While not a "magic box" solution, it offers flexibility for those who enjoy experimenting
 
-You have pen tool for just "draw" weights on each token-track.
+## Getting Started
+A video tutorial is available to help you understand the basics of this extension.
 
-You can change the accent of each token track and then combine it into finaly tokens to save as an Embedding (Textual inversion)
+## Original Repository
+[https://github.com/834t/sd-a1111-b34t-emblab](https://github.com/834t/sd-a1111-b34t-emblab)
 
-btw with this tool It's looks more like work in some sound editor.
+Enjoy experimenting with SD A1111 B34T EmbLab!
 
-this is not a tool for everyone, becouse it can looks a little bit complex, and there no some magic from a box, but you can have realy big fun of it, if you like to experiment.
-
-for example you can create 1-token style by merging some 4-5 tokens like
-
-"shine shock string detailed sharp"
-
-and get some single-token adjustment to change the result of your prompt.
-
-but also you can not just merge.
-
-you can duplicate one of the "token track" incrase its accent and draw an adjustment track by pen tool for use this duplicated row as and adjuster for whole merge.
-
-or just combine you single token by parts of other token weights, or any other variants. It's veryr flexible stuff tbh.
-
-heare a videofile that provide basics for this extension.
-
-works only for SD1.5 but who cares, it's just for fun and you can get it ) have a nice time!
-
-short overview:
+Short Overview:
 
 [![VideoReadMe](https://img.youtube.com/vi/QrAdWanMYR8/0.jpg)](https://www.youtube.com/watch?v=QrAdWanMYR8)
 
-## new features
+## New features
 
-# instruction how to use embedding batch decomposing
+# iInstruction how to use embedding batch decomposing
 
 ![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/automatic%20decomposing%20process.webp)
 
 
 
-# instruction for abilites to group changes of groupIndex and tokenAccent
+# Instruction for abilites to group changes of groupIndex and tokenAccent
 
 ![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/group%20changes.webp) 
 
 
 
-# experimental tool for semi-auto mixing of Embedding tokens.
+# Experimental tool for semi-auto mixing of Embedding tokens.
 
 ![VideoReadMe](https://raw.githubusercontent.com/834t/temp/main/imgs/autogrouping.jpg)
 
 
-# new features
+# New features
 ![20240528](https://github.com/834t/temp/blob/main/imgs/update_features_and_changes2.jpg?raw=true)
