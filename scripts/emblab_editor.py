@@ -88,27 +88,51 @@ def determine_embedding_distribution():
     global emblab_distribution_floor, emblab_distribution_ceiling
     
     cond_model = shared.sd_model.cond_stage_model
-    embedding_layer = cond_model.wrapped.transformer.text_model.embeddings.token_embedding.wrapped
     
-    device = devices.device
-    if cmd_opts.medvram or cmd_opts.lowvram:
-        device = torch.device("cpu")
+    print("Conditional Model Type:", type(cond_model))
     
-    distribution_floor = None
-    distribution_ceiling = None
-    
-    for i in range(49405): 
-        embedding = embedding_layer(torch.LongTensor([i]).to(device)).squeeze(0)
-        if distribution_floor is None:
-            distribution_floor = embedding.clone()
-            distribution_ceiling = embedding.clone()
-        else:
-            distribution_floor = torch.minimum(distribution_floor, embedding)
-            distribution_ceiling = torch.maximum(distribution_ceiling, embedding)
-    
-    emblab_distribution_floor = distribution_floor
-    emblab_distribution_ceiling = distribution_ceiling
+    emblab_distribution_floor = None
+    emblab_distribution_ceiling = None
 
+    try:
+        if 'GeneralConditioner' in str(type(cond_model)):
+            print("Detected SDXL model (GeneralConditioner)")
+            print("EmbLab currently does not support SDXL models.")
+            return False
+        elif hasattr(cond_model, 'wrapped') and hasattr(cond_model.wrapped, 'transformer'):
+            print("Detected SD 1.x model")
+            embedding_layer = cond_model.wrapped.transformer.text_model.embeddings.token_embedding.wrapped
+        elif hasattr(cond_model, 'model') and hasattr(cond_model.model, 'token_embedding'):
+            print("Detected SD 2.x model")
+            embedding_layer = cond_model.model.token_embedding.wrapped
+        else:
+            print("Unable to determine model type or find embedding layer")
+            return False
+
+        device = devices.device
+        if cmd_opts.medvram or cmd_opts.lowvram:
+            device = torch.device("cpu")
+        
+        distribution_floor = None
+        distribution_ceiling = None
+        
+        for i in range(49405): 
+            embedding = embedding_layer(torch.LongTensor([i]).to(device)).squeeze(0)
+            if distribution_floor is None:
+                distribution_floor = embedding.clone()
+                distribution_ceiling = embedding.clone()
+            else:
+                distribution_floor = torch.minimum(distribution_floor, embedding)
+                distribution_ceiling = torch.maximum(distribution_ceiling, embedding)
+        
+        emblab_distribution_floor = distribution_floor
+        emblab_distribution_ceiling = distribution_ceiling
+
+        print("Embedding distribution calculated successfully")
+        return True
+    except Exception as e:
+        print(f"Error in determining embedding distribution: {str(e)}")
+        return False
 #-------------------------------------------------------------------------------
 
 def get_data():
@@ -410,46 +434,45 @@ def save_embedding_foo( save_name, weights ):
     return '\n'.join(results) 
 
 def add_tab():
-    determine_embedding_distribution()
+    embedding_distribution_success = determine_embedding_distribution()
 
     with gr.Blocks(analytics_enabled=False) as ui:
         with gr.Tabs():
             with gr.Row():
-
                 with gr.Column(variant='panel'):
+                    if not embedding_distribution_success:
+                        gr.Markdown("⚠️ EmbLab: Unable to determine embedding distribution. Some features may not work or may be inaccurate.")
+                    
                     with gr.Row():
-
                         with gr.Column():
-
                             mini_input = gr.Textbox(label="Mini tokenizer", lines=1, placeholder="Enter a short prompt (loaded embeddings or modifiers are not supported)")
                     
                             with gr.Row():
                                 mini_tokenize = gr.Button(value="Tokenize", variant="primary")
                                 mini_result = gr.Textbox(label="Tokens", lines=1)
-                                mini_result_vectors = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
+                                mini_result_vectors = gr.Textbox(label="Tokens to vectors", lines=1, visible=False)
                                 
                             with gr.Row():
-                                apply_to_editor = gr.Button( value="Apply to editor", variant="secondary" )
+                                apply_to_editor = gr.Button(value="Apply to editor", variant="secondary")
                             
                         with gr.Column():
-                            
-                            embedding_name_input = gr.Textbox( label="Textual Inversion extractor", lines=1, placeholder="Enter an embedding name that located in your webui/embeddings folder")
+                            embedding_name_input = gr.Textbox(label="Textual Inversion extractor", lines=1, placeholder="Enter an embedding name from your embeddings folder")
                                 
                             with gr.Row():
-                                embedding_to_vectors = gr.Button( label="Parse embedding", value="Check and parse Embedding", variant="secondary" )
+                                embedding_to_vectors = gr.Button(label="Parse embedding", value="Check and parse Embedding", variant="secondary")
 
                             with gr.Row():
-                                apply_parsed_emb_to_project = gr.Button( value="Apply parsed to editor", variant="secondary" )
-                                embimport_result_vectors = gr.Textbox( label="Emb Tokens to vectors", lines=1, visible=False )
+                                apply_parsed_emb_to_project = gr.Button(value="Apply parsed to editor", variant="secondary")
+                                embimport_result_vectors = gr.Textbox(label="Emb Tokens to vectors", lines=1, visible=False)
 
                     with gr.Row():
                         logging_area = gr.Textbox(label="Logs")
 
                     with gr.Row():
-                        combine_embedding = gr.Button( class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary" )
-                        save_name = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
-                        save_weights = gr.Textbox(label="Tokens to vectors", lines=1, visible=False )
-                        save_embedding = gr.Button( value="Save embedding", variant="secondary" )
+                        combine_embedding = gr.Button(class_names="emblab_combine_embedding", value="Combine embedding", variant="secondary")
+                        save_name = gr.Textbox(label="Tokens to vectors", lines=1, visible=False)
+                        save_weights = gr.Textbox(label="Tokens to vectors", lines=1, visible=False)
+                        save_embedding = gr.Button(value="Save embedding", variant="secondary")
                         
                     with gr.Row():
                         emblab_editor_container = gr.HTML(f"""
@@ -457,16 +480,28 @@ def add_tab():
                             """)
 
             # embeddings parsing
-            embedding_to_vectors.click(fn=do_editExistedEmbedding, inputs=embedding_name_input, outputs=[ logging_area, embimport_result_vectors ] )
-            apply_parsed_emb_to_project.click(fn=None, _js="emblab_js_update_byembvectors", inputs=embimport_result_vectors, outputs=[] )
+            embedding_to_vectors.click(
+                fn=do_editExistedEmbedding if embedding_distribution_success else lambda x: ("Embedding parsing is not available due to unsupported model type.", []),
+                inputs=embedding_name_input,
+                outputs=[logging_area, embimport_result_vectors]
+            )
+            apply_parsed_emb_to_project.click(fn=None, _js="emblab_js_update_byembvectors", inputs=embimport_result_vectors, outputs=[])
 
             # tokenizer processing
-            mini_tokenize.click(fn=do_minitokenize, inputs=mini_input, outputs=[ mini_result, mini_result_vectors ])
-            apply_to_editor.click(fn=None, _js="emblab_js_update", inputs=mini_result_vectors, outputs=[] )
+            mini_tokenize.click(
+                fn=do_minitokenize if embedding_distribution_success else lambda x: ("Tokenization is not available due to unsupported model type.", []),
+                inputs=mini_input,
+                outputs=[mini_result, mini_result_vectors]
+            )
+            apply_to_editor.click(fn=None, _js="emblab_js_update", inputs=mini_result_vectors, outputs=[])
 
             # workspace combining and saving
-            combine_embedding.click(fn=None, _js="emblab_js_save_embedding", inputs=None, outputs=[ save_name, save_weights ] )
-            save_embedding.click(fn=save_embedding_foo, inputs=[ save_name, save_weights ], outputs=logging_area )
+            combine_embedding.click(fn=None, _js="emblab_js_save_embedding", inputs=None, outputs=[save_name, save_weights])
+            save_embedding.click(
+                fn=save_embedding_foo if embedding_distribution_success else lambda x, y: "Saving embeddings is not available due to unsupported model type.",
+                inputs=[save_name, save_weights],
+                outputs=logging_area
+            )
 
     return [(ui, "EmbLab", "emblab")]
 
