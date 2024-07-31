@@ -85,24 +85,27 @@ def get_embedding_info( text ):
 
 
 def determine_embedding_distribution():
+    global emblab_distribution_floor, emblab_distribution_ceiling
+    
     cond_model = shared.sd_model.cond_stage_model
-    embedding_layer = cond_model.wrapped.transformer.text_model.embeddings
+    embedding_layer = cond_model.wrapped.transformer.text_model.embeddings.token_embedding.wrapped
     
     device = devices.device
     if cmd_opts.medvram or cmd_opts.lowvram:
         device = torch.device("cpu")
-    #
+    
+    distribution_floor = None
+    distribution_ceiling = None
     
     for i in range(49405): 
-        embedding = embedding_layer.token_embedding.wrapped(torch.LongTensor([i]).to(device)).squeeze(0)
-        if i == 0:
-            distribution_floor = embedding
-            distribution_ceiling = embedding
+        embedding = embedding_layer(torch.LongTensor([i]).to(device)).squeeze(0)
+        if distribution_floor is None:
+            distribution_floor = embedding.clone()
+            distribution_ceiling = embedding.clone()
         else:
             distribution_floor = torch.minimum(distribution_floor, embedding)
             distribution_ceiling = torch.maximum(distribution_ceiling, embedding)
-          
-    global emblab_distribution_floor, emblab_distribution_ceiling
+    
     emblab_distribution_floor = distribution_floor
     emblab_distribution_ceiling = distribution_ceiling
 
