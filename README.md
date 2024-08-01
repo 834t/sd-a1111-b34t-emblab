@@ -22,7 +22,7 @@ This project was inspired by:
 4. Combine tokens using parts of other token weights
 
 ## Notes
-- This tool is designed for SD1.5 but can be used for experimentation and fun
+- This tool is designed for SD1.5 
 - The interface may appear complex, resembling a sound editor
 - While not a "magic box" solution, it offers flexibility for those who enjoy experimenting
 
